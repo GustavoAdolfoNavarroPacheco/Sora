@@ -1804,9 +1804,10 @@ function getChatHTML() {
         </button>
         <div class="cm-user" id="chatTopUser">
           <div class="cm-user-av" id="chatTopAv">CM</div>
-        <div class="cm-user-info">
-          <h3 id="chatTopName">Carlos Mendoza</h3>
-          <p><span style="display:inline-block;width:7px;height:7px;background:var(--forest);border-radius:50%;"></span> En línea · Vacante: <span id="chatTopRole">Operario de Desposte</span></p>
+          <div class="cm-user-info">
+            <h3 id="chatTopName">Carlos Mendoza</h3>
+            <p><span style="display:inline-block;width:7px;height:7px;background:var(--forest);border-radius:50%;"></span> En línea · Vacante: <span id="chatTopRole">Operario de Desposte</span></p>
+          </div>
         </div>
       </div>
       <div class="cm-actions">
@@ -1952,10 +1953,129 @@ function postRenderChat() {
   const chatHistory = document.getElementById('chatHistory');
   const searchInput = document.getElementById('chatSearchInput');
   const miniProfile = document.getElementById('miniProfilePop');
+  const btnManualControl = document.getElementById('btnManualControl');
+  const chatFooter = document.getElementById('chatFooter');
+  const manualTimer = document.getElementById('manualTimer');
+  const mtCount = document.getElementById('mtCount');
   
   let currentStatusFilter = 'all';
+  let inactivityTimer = null;
+  let remainingSeconds = 300;
+  // Per-chat manual state map: { name: { active: bool, seconds: int } }
+  const chatManualState = {};
 
-  // Render Sidebar List
+  // ─── Timer UI ─────────────────────────────────────────────────────────────
+  const updateTimerUI = () => {
+    const m = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
+    const s = (remainingSeconds % 60).toString().padStart(2, '0');
+    if (mtCount) mtCount.textContent = `${m}:${s}`;
+    if (manualTimer) {
+      manualTimer.classList.toggle('pulse', remainingSeconds <= 60);
+    }
+  };
+
+  const stopTimer = () => {
+    clearInterval(inactivityTimer);
+    inactivityTimer = null;
+  };
+
+  const startTimer = () => {
+    stopTimer();
+    inactivityTimer = setInterval(() => {
+      remainingSeconds--;
+      updateTimerUI();
+      if (remainingSeconds <= 0) endManualControl();
+    }, 1000);
+  };
+
+  // ─── Set button to "Tomar Control Manual" state ───────────────────────────
+  const setButtonIdle = () => {
+    if (!btnManualControl) return;
+    btnManualControl.classList.remove('primary');
+    btnManualControl.style.transition = 'all .3s cubic-bezier(.2,.7,.2,1)';
+    btnManualControl.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Tomar Control Manual`;
+  };
+
+  // ─── Set button to "Dejar a la IA" state ──────────────────────────────────
+  const setButtonActive = () => {
+    if (!btnManualControl) return;
+    btnManualControl.classList.add('primary');
+    btnManualControl.style.transition = 'all .3s cubic-bezier(.2,.7,.2,1)';
+    btnManualControl.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Dejar a la IA`;
+  };
+
+  // ─── End Manual Control ───────────────────────────────────────────────────
+  const endManualControl = (silent = false) => {
+    stopTimer();
+    if (chatFooter) {
+      chatFooter.style.transition = 'opacity .3s, max-height .35s';
+      chatFooter.style.opacity = '0';
+      setTimeout(() => { chatFooter.style.display = 'none'; chatFooter.style.opacity = '1'; }, 300);
+    }
+    if (manualTimer) {
+      manualTimer.style.transition = 'opacity .25s, transform .25s';
+      manualTimer.classList.remove('show');
+    }
+    setButtonIdle();
+
+    if (window.activeChatName) {
+      chatManualState[window.activeChatName] = { active: false, seconds: 300 };
+      chatData[window.activeChatName].status = 'sora';
+    }
+
+    if (chatHistory && !silent) {
+      const sys = document.createElement('div');
+      sys.className = 'msg-sys';
+      sys.style.cssText = 'animation: fadeUp .4s forwards; background: rgba(63,102,87,.12); color: var(--forest);';
+      sys.textContent = 'Sora AI ha retomado el control';
+      chatHistory.appendChild(sys);
+      chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+      renderList();
+    }
+  };
+
+  // ─── Start / Toggle Manual Control ────────────────────────────────────────
+  const activateManualControl = (silent = false) => {
+    remainingSeconds = (chatManualState[window.activeChatName] && chatManualState[window.activeChatName].seconds) || 300;
+    if (chatFooter) {
+      chatFooter.style.display = 'flex';
+      chatFooter.style.opacity = '0';
+      requestAnimationFrame(() => {
+        chatFooter.style.transition = 'opacity .3s';
+        chatFooter.style.opacity = '1';
+      });
+    }
+    if (manualTimer) manualTimer.classList.add('show');
+    setButtonActive();
+    updateTimerUI();
+    startTimer();
+
+    if (window.activeChatName) {
+      chatManualState[window.activeChatName] = { active: true, seconds: remainingSeconds };
+      chatData[window.activeChatName].status = 'manual';
+    }
+
+    if (chatHistory && !silent) {
+      const sys = document.createElement('div');
+      sys.className = 'msg-sys';
+      sys.style.cssText = 'animation: fadeUp .4s forwards;';
+      sys.textContent = 'Control manual activado';
+      chatHistory.appendChild(sys);
+      chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+      renderList();
+    }
+  };
+
+  const toggleManualControl = () => {
+    const isActive = chatFooter && chatFooter.style.display === 'flex';
+    if (isActive) {
+      endManualControl(false);
+    } else {
+      activateManualControl(false);
+    }
+  };
+
+  // ─── Render Sidebar List ──────────────────────────────────────────────────
   const renderList = () => {
     const textFilter = searchInput ? searchInput.value.toLowerCase() : '';
     listContainer.innerHTML = '';
@@ -1967,15 +2087,14 @@ function postRenderChat() {
       
       if (matchText && matchStatus) {
         const isActive = name === window.activeChatName ? 'active' : '';
-        // Helper badge visual
         let statusDot = '';
-        if(d.status === 'sora') statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--forest);border-radius:50%;margin-right:3px;"></span>';
-        if(d.status === 'manual') statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--ink);border-radius:50%;margin-right:3px;"></span>';
-        if(d.status === 'wait') statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--mustard-deep);border-radius:50%;margin-right:3px;"></span>';
+        if(d.status === 'sora')    statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--forest);border-radius:50%;margin-right:3px;"></span>';
+        if(d.status === 'manual')  statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--ink);border-radius:50%;margin-right:3px;"></span>';
+        if(d.status === 'wait')    statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--mustard-deep);border-radius:50%;margin-right:3px;"></span>';
         if(d.status === 'blocked') statusDot = '<span style="display:inline-block;width:6px;height:6px;background:#bf4d4d;border-radius:50%;margin-right:3px;"></span>';
 
         listContainer.innerHTML += `
-          <div class="c-item ${isActive}" data-name="${name}">
+          <div class="c-item ${isActive}" data-name="${name}" style="animation: fadeUp .3s forwards;">
             <div class="ci-av" style="background:${d.color}; color:#fff;">${d.initials}</div>
             <div class="ci-info">
               <div class="ci-top">
@@ -1992,33 +2111,52 @@ function postRenderChat() {
     });
   };
 
+  // ─── Load a Chat ──────────────────────────────────────────────────────────
   const loadChat = (name) => {
+    // Save timer state for previous chat
+    if (window.activeChatName && window.activeChatName !== name) {
+      if (chatManualState[window.activeChatName] && chatManualState[window.activeChatName].active) {
+        chatManualState[window.activeChatName].seconds = remainingSeconds;
+        stopTimer(); // Pause timer while away
+      }
+    }
+
     window.activeChatName = name;
     const d = chatData[name];
     renderList();
     
-    // Update Header
-    if(document.getElementById('chatTopAv')) {
-      document.getElementById('chatTopAv').textContent = d.initials;
-      document.getElementById('chatTopAv').style.background = d.color;
-      document.getElementById('chatTopName').textContent = name;
-      document.getElementById('chatTopRole').textContent = d.role;
+    // Update Header with fade animation
+    const topAv = document.getElementById('chatTopAv');
+    const topName = document.getElementById('chatTopName');
+    const topRole = document.getElementById('chatTopRole');
+    if (topAv) {
+      topAv.style.transition = 'transform .3s, opacity .3s';
+      topAv.style.transform = 'scale(.8)'; topAv.style.opacity = '0';
+      setTimeout(() => {
+        topAv.textContent = d.initials;
+        topAv.style.background = d.color;
+        topAv.style.transform = 'scale(1)'; topAv.style.opacity = '1';
+      }, 150);
     }
+    if (topName) topName.textContent = name;
+    if (topRole) topRole.textContent = d.role;
     
     // Update Mini Profile
-    if(document.getElementById('mpAv')) {
-      document.getElementById('mpAv').textContent = d.initials;
-      document.getElementById('mpAv').style.background = d.color;
+    const mpAv = document.getElementById('mpAv');
+    if (mpAv) {
+      mpAv.textContent = d.initials;
+      mpAv.style.background = d.color;
       document.getElementById('mpName').textContent = name;
       document.getElementById('mpRole').textContent = d.role;
       document.getElementById('mpPhone').textContent = d.phone;
       document.getElementById('mpEmail').textContent = d.email;
     }
-    if(miniProfile) miniProfile.classList.remove('show');
+    if (miniProfile) miniProfile.classList.remove('show');
     
     // Update Copilot
-    if(document.getElementById('cpScore')) {
-      document.getElementById('cpScore').textContent = d.score;
+    const cpScore = document.getElementById('cpScore');
+    if (cpScore) {
+      cpScore.textContent = d.score;
       document.getElementById('cpScoreColor').style.color = d.scoreColor;
       document.getElementById('cpAnalysis').textContent = d.analysis;
       const tagsHtml = d.tags.map(t => `<span class="cp-tag">${t}</span>`).join('') + 
@@ -2026,41 +2164,42 @@ function postRenderChat() {
       document.getElementById('cpTags').innerHTML = tagsHtml;
     }
     
-    // Load Messages
-    if(chatHistory) {
-      chatHistory.innerHTML = '';
-      d.messages.forEach(m => {
-        if (m.type === 'sys') {
-          chatHistory.innerHTML += `<div class="msg-sys">${m.text} • ${m.time}</div>`;
-        } else {
-          const cls = m.type === 'sora' ? 'msg out-sora' : (m.type === 'out-human' ? 'msg out-human' : 'msg in');
-          chatHistory.innerHTML += `
-            <div class="${cls}">
-              <span class="msg-time">${m.time}</span>
-              <div class="msg-bubble">${m.text}</div>
-            </div>
-          `;
-        }
-      });
-      chatHistory.scrollTop = chatHistory.scrollHeight;
+    // Load Messages with animation
+    if (chatHistory) {
+      chatHistory.style.opacity = '0';
+      chatHistory.style.transition = 'opacity .25s';
+      setTimeout(() => {
+        chatHistory.innerHTML = '';
+        d.messages.forEach(m => {
+          if (m.type === 'sys') {
+            chatHistory.innerHTML += `<div class="msg-sys">${m.text} • ${m.time}</div>`;
+          } else {
+            const cls = m.type === 'sora' ? 'msg out-sora' : (m.type === 'out-human' ? 'msg out-human' : 'msg in');
+            chatHistory.innerHTML += `
+              <div class="${cls}" style="animation: fadeUp .35s forwards;">
+                <span class="msg-time">${m.time}</span>
+                <div class="msg-bubble">${m.text}</div>
+              </div>
+            `;
+          }
+        });
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        chatHistory.style.opacity = '1';
+      }, 200);
     }
 
-    // Adjust UI state if it's blocked or manual
-    if(d.status === 'blocked') {
-      if(document.getElementById('btnManualControl')) document.getElementById('btnManualControl').style.display = 'none';
-      if(document.getElementById('chatFooter')) document.getElementById('chatFooter').style.display = 'none';
+    // ── Restore UI state for this chat ──────────────────────────────────────
+    if (btnManualControl) btnManualControl.style.display = 'flex';
+    const state = chatManualState[name];
+    const wasActive = state ? state.active : (d.status === 'manual');
+    if (wasActive) {
+      activateManualControl(true); // Restore timer, show footer
     } else {
-      if(document.getElementById('btnManualControl')) document.getElementById('btnManualControl').style.display = 'flex';
-      // If manual is set but footer is hidden, or if it was just loaded
-      if(d.status === 'manual' && document.getElementById('chatFooter').style.display !== 'flex') {
-         toggleManualControl(true);
-      } else if(d.status !== 'manual' && document.getElementById('chatFooter').style.display === 'flex') {
-         endManualControl(true);
-      }
+      endManualControl(true); // Ensure clean state
     }
   };
 
-  // Status Filter clicks
+  // ─── Filter chips ─────────────────────────────────────────────────────────
   const filterChips = document.querySelectorAll('.cs-filter-chip');
   filterChips.forEach(chip => {
     chip.addEventListener('click', () => {
@@ -2071,14 +2210,14 @@ function postRenderChat() {
     });
   });
 
-  // Init
+  // ─── Init ─────────────────────────────────────────────────────────────────
   loadChat('Carlos Mendoza');
 
-  // Search functionality
-  if(searchInput) searchInput.addEventListener('input', () => renderList());
+  // Search
+  if (searchInput) searchInput.addEventListener('input', () => renderList());
 
   // Chat Item click
-  if(listContainer) {
+  if (listContainer) {
     listContainer.addEventListener('click', (e) => {
       const item = e.target.closest('.c-item');
       if (item) {
@@ -2089,136 +2228,61 @@ function postRenderChat() {
   }
 
   // Back Button click
-  if(document.getElementById('chatBackBtn')) {
-    document.getElementById('chatBackBtn').addEventListener('click', () => {
+  const chatBackBtn = document.getElementById('chatBackBtn');
+  if (chatBackBtn) {
+    chatBackBtn.addEventListener('click', () => {
       document.querySelector('.chat-wrapper').classList.remove('show-chat');
     });
   }
 
   // Mini profile toggle
   const chatTopUser = document.getElementById('chatTopUser');
-  if(chatTopUser && miniProfile) {
+  if (chatTopUser && miniProfile) {
     chatTopUser.addEventListener('click', (e) => {
       e.stopPropagation();
       miniProfile.classList.toggle('show');
     });
     document.addEventListener('click', (e) => {
-      if(!miniProfile.contains(e.target)) miniProfile.classList.remove('show');
+      if (!miniProfile.contains(e.target)) miniProfile.classList.remove('show');
     });
   }
 
-  // Manual Control logic
-  const btnManualControl = document.getElementById('btnManualControl');
-  const txtManualControl = document.getElementById('txtManualControl');
-  const chatFooter = document.getElementById('chatFooter');
-  const manualTimer = document.getElementById('manualTimer');
-  const mtCount = document.getElementById('mtCount');
-  
-  let inactivityTimer = null;
-  let remainingSeconds = 300; // 5 minutes
-
-  const updateTimerUI = () => {
-    const m = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
-    const s = (remainingSeconds % 60).toString().padStart(2, '0');
-    if (mtCount) mtCount.textContent = `${m}:${s}`;
-    if (remainingSeconds <= 60 && manualTimer) manualTimer.classList.add('pulse');
-    else if (manualTimer) manualTimer.classList.remove('pulse');
-  };
-
-  const endManualControl = (silent = false) => {
-    clearInterval(inactivityTimer);
-    if(chatFooter) chatFooter.style.display = 'none';
-    if(manualTimer) manualTimer.classList.remove('show');
-    if(btnManualControl) {
-      btnManualControl.classList.remove('primary');
-      btnManualControl.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> <span id="txtManualControl">Tomar Control Manual</span>`;
-    }
-    // Add system message if not loading chat context
-    if(chatHistory && !silent) {
-      chatData[window.activeChatName].status = 'sora'; // Update status mock
-      renderList();
-      chatHistory.innerHTML += `<div class="msg-sys" style="animation: vacEnter .4s forwards; background: rgba(63,102,87,.12); color: var(--forest);">Sora AI ha retomado el control</div>`;
-      chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
-    }
-  };
-
-  const resetTimer = () => {
-    remainingSeconds = 300;
-    updateTimerUI();
-    clearInterval(inactivityTimer);
-    inactivityTimer = setInterval(() => {
-      remainingSeconds--;
-      updateTimerUI();
-      if (remainingSeconds <= 0) {
-        endManualControl();
-      }
-    }, 1000);
-  };
-
-  const toggleManualControl = (silent = false) => {
-    if(chatFooter && chatFooter.style.display === 'flex' && !silent) {
-      endManualControl();
-    } else {
-      if(chatFooter) chatFooter.style.display = 'flex';
-      if(btnManualControl) {
-        btnManualControl.classList.add('primary');
-        btnManualControl.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span id="txtManualControl">Dejar a la IA</span>`;
-      }
-      
-      if(manualTimer) manualTimer.classList.add('show');
-      resetTimer();
-      
-      if(chatHistory && !silent) {
-        chatData[window.activeChatName].status = 'manual'; // Update status mock
-        renderList();
-        chatHistory.innerHTML += `<div class="msg-sys" style="animation: vacEnter .4s forwards;">Control manual activado</div>`;
-        chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
-      }
-    }
-  };
-
-  if(btnManualControl) {
-    // Remove old event listeners if any (though usually postRender is called once)
-    const newBtn = btnManualControl.cloneNode(true);
-    btnManualControl.parentNode.replaceChild(newBtn, btnManualControl);
-    newBtn.addEventListener('click', () => toggleManualControl(false));
+  // Manual Control button
+  if (btnManualControl) {
+    btnManualControl.addEventListener('click', toggleManualControl);
   }
 
-  // Sending Messages
+  // ─── Send Messages ────────────────────────────────────────────────────────
   const btnSend = document.getElementById('btnSendMsg');
   const chatInput = document.getElementById('chatInput');
+
   const sendHumanMessage = () => {
-    if(!chatInput) return;
+    if (!chatInput) return;
     const val = chatInput.value.trim();
-    if(!val) return;
+    if (!val) return;
     const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    if(chatHistory) {
-      chatHistory.innerHTML += `
-        <div class="msg out-human">
-          <span class="msg-time">${timeStr}</span>
-          <div class="msg-bubble">${val}</div>
-        </div>
-      `;
+    if (chatHistory) {
+      const msg = document.createElement('div');
+      msg.className = 'msg out-human';
+      msg.style.cssText = 'animation: fadeUp .35s forwards;';
+      msg.innerHTML = `<span class="msg-time">${timeStr}</span><div class="msg-bubble">${val}</div>`;
+      chatHistory.appendChild(msg);
       chatData[window.activeChatName].messages.push({ type: 'out-human', time: timeStr, text: val });
-      chatData[window.activeChatName].lastMsg = val; // Update sidebar
+      chatData[window.activeChatName].lastMsg = val;
       renderList();
       chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
     }
     chatInput.value = '';
-    if (chatFooter && chatFooter.style.display === 'flex') resetTimer();
+    if (chatFooter && chatFooter.style.display === 'flex') {
+      remainingSeconds = 300;
+      updateTimerUI();
+    }
   };
   
-  if(btnSend) {
-      const newSend = btnSend.cloneNode(true);
-      btnSend.parentNode.replaceChild(newSend, btnSend);
-      newSend.addEventListener('click', sendHumanMessage);
-  }
-  if(chatInput) {
-    const newInput = chatInput.cloneNode(true);
-    chatInput.parentNode.replaceChild(newInput, chatInput);
-    newInput.addEventListener('keypress', (e) => { 
-      if (chatFooter && chatFooter.style.display === 'flex') resetTimer();
-      if(e.key === 'Enter') sendHumanMessage(); 
+  if (btnSend) btnSend.addEventListener('click', sendHumanMessage);
+  if (chatInput) {
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendHumanMessage();
     });
   }
 }
@@ -4284,9 +4348,7 @@ function postRenderConfig() {
       </div>
     </div>
     <div class="prof-menu">
-      <div class="p-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Mi Perfil</div>
-      <div class="p-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Editar Cuenta</div>
-      <div class="p-item" id="navConfigBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a8 8 0 0 0 0-2l2-1.5-2-3.4-2.4.6a8 8 0 0 0-1.7-1l-.3-2.5h-4l-.3 2.5a8 8 0 0 0-1.7 1l-2.4-.6-2 3.4 2 1.5a8 8 0 0 0 0 2l-2 1.5 2 3.4 2.4-.6a8 8 0 0 0 1.7 1l.3 2.5h4l.3-2.5a8 8 0 0 0 1.7-1l2.4.6 2-3.4z"/></svg> Preferencias</div>
+      <div class="p-item" id="navConfigBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a8 8 0 0 0 0-2l2-1.5-2-3.4-2.4.6a8 8 0 0 0-1.7-1l-.3-2.5h-4l-.3 2.5a8 8 0 0 0-1.7 1l-2.4-.6-2 3.4 2 1.5a8 8 0 0 0 0 2l-2 1.5 2 3.4 2.4-.6a8 8 0 0 0 1.7 1l.3 2.5h4l.3-2.5a8 8 0 0 0 1.7-1l2.4.6 2-3.4z"/></svg> Configuración</div>
       <div class="p-item logout" id="pLogout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Cerrar Sesión</div>
     </div>
   `;
@@ -4336,7 +4398,8 @@ function postRenderConfig() {
 
   document.getElementById('navConfigBtn').addEventListener('click', () => {
     profPop.classList.remove('show');
-    renderSection('config');
+    const configBtn = document.querySelector('.nav-item[data-section="config"]');
+    if (configBtn) configBtn.click();
   });
 
   document.getElementById('clearNotifBtn').addEventListener('click', () => {
