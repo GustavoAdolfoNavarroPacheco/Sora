@@ -251,13 +251,16 @@
     .brand-panel{ display:none; }
     .form-panel{ padding:2.4rem 1.4rem; }
   }
-  @media (max-width:840px){
+  @media (max-width:768px){
     .app-shell.is-visible{ display:block; }
     .sidebar{ position:fixed; inset:0 auto 0 0; width:264px !important; transform:translateX(-100%); transition:transform .25s ease; z-index:100; box-shadow:var(--shadow-lg); }
     .sidebar.is-open{ transform:translateX(0); }
     .menu-btn{ display:flex !important; }
   }
   .menu-btn{ display:none; }
+  
+  .sidebar-backdrop { position:fixed; inset:0; background:rgba(16,35,48,.5); backdrop-filter:blur(2px); z-index:95; opacity:0; pointer-events:none; transition:opacity .25s; display:none; }
+  .sidebar-backdrop.is-open { display:block; opacity:1; pointer-events:auto; }
 
   @media (prefers-reduced-motion: reduce){
     *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
@@ -407,6 +410,7 @@
 
 <!-- ============ APP SHELL ============ -->
 <div class="app-shell" id="appShell" hidden>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
   <aside class="sidebar" id="sidebar">
     <div class="brand-top">
       <span class="logo-mark">
@@ -609,6 +613,12 @@
 
   document.getElementById('menuBtn').addEventListener('click', ()=>{
     document.getElementById('sidebar').classList.toggle('is-open');
+    document.getElementById('sidebarBackdrop').classList.toggle('is-open');
+  });
+  
+  document.getElementById('sidebarBackdrop').addEventListener('click', ()=>{
+    document.getElementById('sidebar').classList.remove('is-open');
+    document.getElementById('sidebarBackdrop').classList.remove('is-open');
   });
 
   // ---- reveal / hide app shell ----
@@ -697,7 +707,7 @@ function getDashboardHTML() {
   .fnl-lbl{font-size:.84rem;font-weight:500;color:var(--ink-soft);display:flex;align-items:center;gap:.5rem;}
   .fnl-n{font-family:var(--font-mono);font-size:.68rem;background:rgba(27,58,77,.06);width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--ink);font-weight:600;flex-shrink:0;}
   .fnl-track{background:var(--pearl);height:30px;border-radius:8px;overflow:hidden;position:relative;}
-  .fnl-bar{height:100%;border-radius:8px;width:0;transition:width 1.2s cubic-bezier(.2,.7,.2,1);display:flex;align-items:center;justify-content:flex-end;padding-right:.6rem;min-width:0;}
+  .fnl-bar{height:100%;border-radius:8px;width:0;transition:width 1.2s cubic-bezier(.2,.7,.2,1);display:flex;align-items:center;justify-content:flex-end;padding-right:.6rem;min-width:3.2rem;}
   .fnl-bar span{font-family:var(--font-mono);font-size:.7rem;font-weight:600;color:rgba(255,255,255,.9);white-space:nowrap;}
   .fnl-bar.b1{background:linear-gradient(90deg,var(--ink),var(--ink-soft));}
   .fnl-bar.b2{background:linear-gradient(90deg,#254d66,#3a6b8a);}
@@ -998,371 +1008,626 @@ function animateCounter(el, start, end, suffix, duration){
 function getVacantesHTML() {
   return `
 <style>
-  .vac-wrapper { animation: dashEnter .6s cubic-bezier(.2,.7,.2,1) both; display: flex; flex-direction: column; gap: 1.5rem; height: calc(100vh - 72px - 4.8rem); min-height: 500px; }
-  
-  /* Header & Controls */
-  .vac-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-  .vac-stats { display: flex; gap: 2rem; }
-  .vac-stat { display: flex; flex-direction: column; }
-  .vac-stat-val { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--ink); line-height: 1.1; }
-  .vac-stat-lbl { font-size: .8rem; color: var(--slate); font-weight: 500; }
-  
-  .vac-actions { display: flex; gap: 1rem; align-items: center; }
-  .view-toggle { display: flex; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow-sm); }
-  .vt-btn { background: none; border: none; padding: .6rem .8rem; color: var(--slate); cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; }
-  .vt-btn.active { background: rgba(63,102,87,.1); color: var(--forest); }
-  .vt-btn:hover:not(.active) { background: var(--pearl); }
-  
-  .btn-new-vac { background: var(--ink); color: var(--bone); border: none; padding: .7rem 1.2rem; border-radius: var(--radius-sm); font-weight: 600; font-size: .9rem; display: flex; align-items: center; gap: .6rem; box-shadow: var(--shadow-sm); transition: all .2s; }
-  .btn-new-vac:hover { background: var(--ink-soft); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  /* ══════════════════════════════════════
+     VACANTES — REDISEÑO TOTAL v2
+  ══════════════════════════════════════ */
+  @keyframes vacEnter    { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:none} }
+  @keyframes vacSlideR   { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:none} }
+  @keyframes vacColEnter { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
+  @keyframes vacCardIn   { from{opacity:0;transform:translateY(16px) scale(.97)} to{opacity:1;transform:none} }
+  @keyframes vacModalIn  { from{opacity:0;transform:translateY(28px) scale(.96)} to{opacity:1;transform:none} }
+  @keyframes vacDotBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  @keyframes vacFloat    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
 
-  /* Board Area */
-  .vac-board { flex: 1; display: flex; gap: 1.2rem; overflow-x: auto; padding-bottom: 1rem; }
-  .vac-board::-webkit-scrollbar { height: 8px; }
-  .vac-board::-webkit-scrollbar-track { background: var(--pearl); border-radius: 4px; }
-  .vac-board::-webkit-scrollbar-thumb { background: var(--slate-light); border-radius: 4px; }
-  
-  .vac-col { background: rgba(238,240,239,.6); border: 1.5px dashed var(--line); border-radius: var(--radius-md); width: 290px; flex-shrink: 0; display: flex; flex-direction: column; padding: 1rem; }
-  .vac-col-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; padding: 0 .2rem; }
-  .vac-col-title { font-size: .88rem; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; margin: 0; }
-  .vac-col-count { background: var(--white); font-family: var(--font-mono); font-size: .75rem; font-weight: 600; color: var(--slate); padding: .2rem .6rem; border-radius: 20px; box-shadow: var(--shadow-sm); border: 1px solid var(--line); }
-  
-  /* Cards */
-  .v-card { background: var(--white); border-radius: var(--radius-sm); padding: 1.1rem; margin-bottom: .9rem; box-shadow: var(--shadow-sm); border: 1px solid var(--line); cursor: pointer; transition: all .25s ease; position: relative; border-left: 4px solid transparent; }
-  .v-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: rgba(63,102,87,.3); }
-  .v-card.sla-ok { border-left-color: var(--forest); }
-  .v-card.sla-warn { border-left-color: var(--mustard); }
-  .v-card.sla-danger { border-left-color: #bf4d4d; }
-  
-  .vc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .8rem; }
-  .vc-title { font-weight: 600; font-size: .95rem; color: var(--ink); margin: 0 0 .3rem; line-height: 1.3; }
-  .vc-sub { font-size: .78rem; color: var(--slate); margin: 0; }
-  
-  .vc-score { display: inline-flex; align-items: center; gap: .3rem; background: rgba(217,164,65,.15); color: var(--mustard-deep); font-family: var(--font-mono); font-weight: 700; font-size: .75rem; padding: .25rem .6rem; border-radius: 6px; }
-  .vc-score.hi { background: rgba(63,102,87,.1); color: var(--forest); }
-  .vc-score.lo { background: rgba(191,77,77,.1); color: #bf4d4d; }
-  
-  .vc-mid { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
-  .vc-badge { font-size: .72rem; font-weight: 500; padding: .2rem .5rem; border-radius: 4px; background: var(--pearl); color: var(--slate); border: 1px solid rgba(0,0,0,.03); }
-  
-  .vc-bot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: .8rem; }
-  .vc-cand { display: flex; align-items: center; gap: .5rem; }
-  .vc-av { width: 24px; height: 24px; border-radius: 50%; background: var(--ink-soft); color: var(--white); font-size: .65rem; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-  .vc-cand-name { font-size: .8rem; font-weight: 500; color: var(--ink-soft); }
-  .vc-time { font-family: var(--font-mono); font-size: .75rem; color: var(--slate-light); display: flex; align-items: center; gap: .3rem; }
-  .vc-time.late { color: #bf4d4d; font-weight: 600; }
-  .vc-time.imminent { color: var(--mustard-deep); font-weight: 600; }
+  .vac2-wrapper {
+    animation: vacEnter .55s cubic-bezier(.2,.7,.2,1) both;
+    display: flex; flex-direction: column; gap: 1.4rem;
+    min-height: calc(100vh - 72px - 4.8rem);
+  }
 
-  /* List View */
-  .vac-list-view { display: flex; flex-direction: column; background: var(--white); border-radius: var(--radius-md); border: 1px solid var(--line); overflow: hidden; box-shadow: var(--shadow-sm); }
-  .vl-head { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1.5fr 1.5fr; padding: 1.2rem 1.5rem; background: var(--pearl); border-bottom: 1px solid var(--line); font-size: .82rem; font-weight: 600; color: var(--slate); text-transform: uppercase; letter-spacing: .04em; }
-  .vl-row { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1.5fr 1.5fr; padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--line); align-items: center; transition: background .15s; }
-  .vl-row:hover { background: rgba(250,250,249,.8); }
-  .vl-row:last-child { border-bottom: none; }
-  
-  .vl-info .vl-title { font-weight: 600; font-size: 1rem; color: var(--ink); margin: 0 0 .25rem; }
-  .vl-info .vl-sub { font-size: .82rem; color: var(--slate); margin: 0; }
-  .vl-cand { display: flex; align-items: center; gap: .6rem; font-size: .9rem; font-weight: 500; color: var(--ink-soft); }
-  
-  .sla-bar-bg { height: 6px; background: var(--pearl); border-radius: 3px; overflow: hidden; width: 120px; margin-top: .5rem; }
-  .sla-bar-fill { height: 100%; border-radius: 3px; }
-  .sla-ok-bg { background: var(--forest); }
-  .sla-warn-bg { background: var(--mustard); }
-  .sla-danger-bg { background: #bf4d4d; }
-  
-  .hidden { display: none !important; }
+  /* Hero */
+  .vac2-hero {
+    background: linear-gradient(135deg, var(--ink) 0%, #1a3f56 60%, #1f4a5e 100%);
+    border-radius: var(--radius-lg); padding: 1.6rem 2rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
+    position: relative; overflow: hidden; flex-wrap: wrap;
+  }
+  .vac2-hero::before {
+    content:''; position:absolute; width:340px; height:340px; border-radius:50%;
+    background:radial-gradient(circle,rgba(217,164,65,.14) 0%,transparent 70%);
+    top:-120px; right:-80px; pointer-events:none;
+  }
+  .vac2-hero::after {
+    content:''; position:absolute; width:200px; height:200px; border-radius:50%;
+    background:radial-gradient(circle,rgba(63,102,87,.18) 0%,transparent 70%);
+    bottom:-60px; left:30%; pointer-events:none;
+  }
+  .vac2-hero-left { position:relative; z-index:1; }
+  .vac2-hero-eyebrow {
+    font-family:var(--font-mono); font-size:.65rem; letter-spacing:.1em; text-transform:uppercase;
+    color:rgba(241,215,160,.6); margin:0 0 .4rem; display:flex; align-items:center; gap:.5rem;
+  }
+  .vac2-hero-dot { width:6px; height:6px; border-radius:50%; background:var(--mustard-soft); animation:vacDotBlink 2s ease-in-out infinite; }
+  .vac2-hero-title { font-family:var(--font-display); font-weight:700; font-size:1.55rem; color:var(--white); margin:0; }
+  .vac2-kpi-row { display:flex; gap:2.5rem; position:relative; z-index:1; flex-wrap:wrap; }
+  .vac2-kpi { display:flex; flex-direction:column; align-items:center; opacity:0; animation:vacSlideR .5s cubic-bezier(.2,.7,.2,1) forwards; }
+  .vac2-kpi:nth-child(1){animation-delay:.1s} .vac2-kpi:nth-child(2){animation-delay:.2s} .vac2-kpi:nth-child(3){animation-delay:.3s} .vac2-kpi:nth-child(4){animation-delay:.4s}
+  .vac2-kpi-val { font-family:var(--font-display); font-weight:800; font-size:2rem; color:var(--white); line-height:1; margin-bottom:.2rem; }
+  .vac2-kpi-val.accent{color:var(--mustard-soft)} .vac2-kpi-val.danger{color:#f08080} .vac2-kpi-val.good{color:#7ecbb0}
+  .vac2-kpi-lbl { font-size:.72rem; color:rgba(250,250,249,.52); font-weight:500; white-space:nowrap; }
+  .vac2-kpi-div { width:1px; background:rgba(255,255,255,.1); align-self:stretch; margin:.2rem 0; }
+
+  /* Controls */
+  .vac2-controls { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.9rem; }
+  .vac2-view-group { display:flex; background:var(--white); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; box-shadow:var(--shadow-sm); }
+  .vac2-vbtn { display:flex; align-items:center; gap:.45rem; padding:.6rem .95rem; background:none; border:none; cursor:pointer; color:var(--slate); font-size:.82rem; font-weight:600; font-family:inherit; transition:all .2s; white-space:nowrap; }
+  .vac2-vbtn.active { background:var(--ink); color:var(--white); }
+  .vac2-vbtn:hover:not(.active) { background:var(--pearl); color:var(--ink); }
+  .vac2-right-ctrls { display:flex; gap:.8rem; align-items:center; flex-wrap:wrap; }
+  .vac2-search { display:flex; align-items:center; gap:.5rem; background:var(--white); border:1px solid var(--line); border-radius:var(--radius-sm); padding:.55rem .9rem; box-shadow:var(--shadow-sm); transition:border-color .2s,box-shadow .2s; }
+  .vac2-search:focus-within { border-color:rgba(63,102,87,.4); box-shadow:0 0 0 3px rgba(63,102,87,.08),var(--shadow-sm); }
+  .vac2-search input { border:none; outline:none; background:transparent; font-size:.85rem; color:var(--ink); font-family:inherit; width:180px; }
+  .vac2-search input::placeholder { color:var(--slate-light); }
+  .vac2-btn-new { display:flex; align-items:center; gap:.55rem; padding:.68rem 1.3rem; background:linear-gradient(135deg,var(--ink) 0%,var(--ink-soft) 100%); color:var(--white); border:none; border-radius:var(--radius-sm); font-weight:700; font-size:.88rem; font-family:inherit; cursor:pointer; box-shadow:0 4px 14px rgba(27,58,77,.25); transition:all .25s; }
+  .vac2-btn-new:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(27,58,77,.32); }
+  .vac2-btn-new:active { transform:scale(.97); }
+
+  /* Board */
+  .vac2-board { display:flex; gap:1.1rem; overflow-x:auto; padding-bottom:1rem; scroll-snap-type:x mandatory; }
+  .vac2-board::-webkit-scrollbar { height:6px; }
+  .vac2-board::-webkit-scrollbar-track { background:var(--pearl); border-radius:3px; }
+  .vac2-board::-webkit-scrollbar-thumb { background:rgba(84,91,98,.35); border-radius:3px; }
+  .vac2-col { flex:1; min-width:280px; display:flex; flex-direction:column; border-radius:var(--radius-md); scroll-snap-align:start; opacity:0; animation:vacColEnter .6s cubic-bezier(.2,.7,.2,1) forwards; }
+  .vac2-col:nth-child(1){animation-delay:.08s} .vac2-col:nth-child(2){animation-delay:.16s} .vac2-col:nth-child(3){animation-delay:.24s} .vac2-col:nth-child(4){animation-delay:.32s} .vac2-col:nth-child(5){animation-delay:.40s}
+  .vac2-col-hd { display:flex; align-items:center; justify-content:space-between; padding:.9rem 1rem .75rem; border-radius:var(--radius-sm) var(--radius-sm) 0 0; }
+  .vac2-col-nm { display:flex; align-items:center; gap:.55rem; }
+  .vac2-col-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .vac2-col-name { font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
+  .vac2-col-cnt { font-family:var(--font-mono); font-size:.72rem; font-weight:700; padding:.18rem .55rem; border-radius:20px; }
+  .vac2-col-body { flex:1; padding:.6rem; border-radius:0 0 var(--radius-md) var(--radius-md); display:flex; flex-direction:column; gap:.75rem; min-height:200px; }
+
+  /* Col themes */
+  .col-pref  .vac2-col-hd   { background:rgba(92,132,115,.08); }
+  .col-pref  .vac2-col-body { background:rgba(92,132,115,.04); border:1.5px solid rgba(92,132,115,.18); border-top:none; }
+  .col-pref  .vac2-col-dot  { background:#5C8473; }
+  .col-pref  .vac2-col-cnt  { background:rgba(92,132,115,.12); color:#5C8473; }
+  .col-aplica .vac2-col-hd   { background:rgba(41,98,255,.06); }
+  .col-aplica .vac2-col-body { background:rgba(41,98,255,.03); border:1.5px solid rgba(41,98,255,.15); border-top:none; }
+  .col-aplica .vac2-col-dot  { background:#2962ff; }
+  .col-aplica .vac2-col-cnt  { background:rgba(41,98,255,.1); color:#2962ff; }
+  .col-agenda .vac2-col-hd   { background:rgba(217,164,65,.1); }
+  .col-agenda .vac2-col-body { background:rgba(217,164,65,.04); border:1.5px solid rgba(217,164,65,.22); border-top:none; }
+  .col-agenda .vac2-col-dot  { background:var(--mustard-deep); }
+  .col-agenda .vac2-col-cnt  { background:rgba(217,164,65,.15); color:var(--mustard-deep); }
+  .col-entrev .vac2-col-hd   { background:rgba(138,77,162,.07); }
+  .col-entrev .vac2-col-body { background:rgba(138,77,162,.03); border:1.5px solid rgba(138,77,162,.15); border-top:none; }
+  .col-entrev .vac2-col-dot  { background:#8a4da2; }
+  .col-entrev .vac2-col-cnt  { background:rgba(138,77,162,.1); color:#8a4da2; }
+  .col-contrat .vac2-col-hd   { background:rgba(63,102,87,.1); }
+  .col-contrat .vac2-col-body { background:rgba(63,102,87,.04); border:1.5px solid rgba(63,102,87,.22); border-top:none; }
+  .col-contrat .vac2-col-dot  { background:var(--forest); }
+  .col-contrat .vac2-col-cnt  { background:rgba(63,102,87,.12); color:var(--forest); }
+
+  /* Kanban Card */
+  .vk-card { background:var(--white); border-radius:var(--radius-sm); border:1px solid var(--line); box-shadow:var(--shadow-sm); cursor:pointer; transition:all .25s cubic-bezier(.2,.7,.2,1); position:relative; overflow:hidden; opacity:0; animation:vacCardIn .45s cubic-bezier(.2,.7,.2,1) forwards; }
+  .vk-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; transition:width .25s; }
+  .vk-card:hover { transform:translateY(-5px) scale(1.01); box-shadow:0 12px 28px rgba(27,58,77,.12); }
+  .vk-card:hover::before { width:5px; }
+  .vk-card.sla-ok::before    { background:var(--forest); }
+  .vk-card.sla-warn::before  { background:var(--mustard-deep); }
+  .vk-card.sla-danger::before { background:#bf4d4d; }
+  .vk-inner { padding:1rem 1rem 1rem 1.15rem; }
+  .vk-top { display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem; margin-bottom:.65rem; }
+  .vk-tw  { flex:1; min-width:0; }
+  .vk-title { font-weight:700; font-size:.9rem; color:var(--ink); margin:0 0 .2rem; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vk-loc   { font-size:.73rem; color:var(--slate); margin:0; display:flex; align-items:center; gap:.3rem; }
+  .vk-score { flex-shrink:0; display:inline-flex; align-items:center; gap:.3rem; font-family:var(--font-mono); font-size:.72rem; font-weight:800; padding:.28rem .6rem; border-radius:20px; letter-spacing:.02em; transition:transform .2s; }
+  .vk-card:hover .vk-score { transform:scale(1.08); }
+  .vk-score svg { animation:vacFloat 2.5s ease-in-out infinite; }
+  .vk-score.hi  { background:rgba(63,102,87,.12); color:var(--forest); border:1px solid rgba(63,102,87,.2); }
+  .vk-score.mid { background:rgba(217,164,65,.15); color:var(--mustard-deep); border:1px solid rgba(217,164,65,.25); }
+  .vk-score.lo  { background:rgba(191,77,77,.1); color:#bf4d4d; border:1px solid rgba(191,77,77,.2); }
+  .vk-think { display:flex; align-items:center; gap:.4rem; margin-bottom:.6rem; font-size:.7rem; color:var(--forest); font-weight:600; }
+  .vk-think span { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--forest); animation:vacDotBlink 1s ease-in-out infinite; }
+  .vk-think span:nth-child(2){animation-delay:.2s} .vk-think span:nth-child(3){animation-delay:.4s}
+  .vk-badges { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.75rem; }
+  .vk-badge { font-size:.7rem; font-weight:600; padding:.2rem .55rem; border-radius:5px; border:1px solid transparent; white-space:nowrap; }
+  .vk-badge.green  { background:rgba(63,102,87,.08); color:var(--forest); border-color:rgba(63,102,87,.15); }
+  .vk-badge.yellow { background:rgba(217,164,65,.12); color:var(--mustard-deep); border-color:rgba(217,164,65,.2); }
+  .vk-badge.blue   { background:rgba(41,98,255,.07); color:#2962ff; border-color:rgba(41,98,255,.15); }
+  .vk-badge.red    { background:rgba(191,77,77,.08); color:#bf4d4d; border-color:rgba(191,77,77,.15); }
+  .vk-badge.purple { background:rgba(138,77,162,.08); color:#8a4da2; border-color:rgba(138,77,162,.15); }
+  .vk-badge.gray   { background:var(--pearl); color:var(--slate); }
+  .vk-cand { display:flex; align-items:center; justify-content:space-between; border-top:1px solid rgba(225,229,228,.7); padding-top:.7rem; }
+  .vk-ci   { display:flex; align-items:center; gap:.55rem; }
+  .vk-av   { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-size:.62rem; font-weight:700; color:var(--white); flex-shrink:0; }
+  .vk-cname { font-size:.78rem; font-weight:600; color:var(--ink-soft); }
+  .vk-time { font-family:var(--font-mono); font-size:.7rem; display:flex; align-items:center; gap:.28rem; color:var(--slate-light); }
+  .vk-time.late     { color:#bf4d4d; font-weight:700; }
+  .vk-time.imminent { color:var(--mustard-deep); font-weight:700; }
+  .vk-time.good     { color:var(--forest); font-weight:600; }
+
+  /* List view */
+  .vac2-list { background:var(--white); border-radius:var(--radius-md); border:1px solid var(--line); overflow:hidden; box-shadow:var(--shadow-sm); }
+  .vl2-tb { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.5rem; border-bottom:1px solid var(--line); background:var(--pearl); flex-wrap:wrap; gap:.7rem; }
+  .vl2-sg { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; }
+  .vl2-sg-lbl { font-size:.78rem; font-weight:700; color:var(--slate); }
+  .vl2-sb { display:flex; align-items:center; gap:.3rem; padding:.4rem .8rem; background:var(--white); border:1px solid var(--line); border-radius:20px; font-size:.78rem; font-weight:600; color:var(--slate); cursor:pointer; font-family:inherit; transition:all .2s; }
+  .vl2-sb.active { background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .vl2-sb:hover:not(.active) { border-color:var(--forest); color:var(--forest); }
+  .vl2-cnt { font-size:.8rem; color:var(--slate); font-weight:500; }
+  .vl2-hd { display:grid; grid-template-columns:2.2fr 1.4fr 90px 130px 1fr; padding:.9rem 1.5rem; border-bottom:1px solid var(--line); font-size:.74rem; font-weight:700; color:var(--slate-light); text-transform:uppercase; letter-spacing:.05em; }
+  .vl2-row { display:grid; grid-template-columns:2.2fr 1.4fr 90px 130px 1fr; padding:1.1rem 1.5rem; border-bottom:1px solid var(--line); align-items:center; transition:background .15s,transform .15s; cursor:pointer; }
+  .vl2-row:last-child { border-bottom:none; }
+  .vl2-row:hover { background:rgba(63,102,87,.03); transform:translateX(3px); }
+  .vl2-title { font-weight:700; font-size:.93rem; color:var(--ink); margin:0 0 .2rem; }
+  .vl2-sub   { font-size:.78rem; color:var(--slate); margin:0; display:flex; align-items:center; gap:.4rem; }
+  .vl2-cand  { display:flex; align-items:center; gap:.55rem; font-size:.85rem; font-weight:600; color:var(--ink-soft); }
+  .vl2-ph { display:inline-flex; align-items:center; gap:.3rem; font-size:.73rem; font-weight:700; padding:.28rem .65rem; border-radius:20px; }
+  .vl2-ph.p0{background:rgba(92,132,115,.1);color:#5C8473} .vl2-ph.p1{background:rgba(41,98,255,.1);color:#2962ff}
+  .vl2-ph.p2{background:rgba(217,164,65,.15);color:var(--mustard-deep)} .vl2-ph.p3{background:rgba(138,77,162,.1);color:#8a4da2}
+  .vl2-ph.p4{background:rgba(63,102,87,.1);color:var(--forest)}
+  .vl2-sla { display:flex; flex-direction:column; gap:.3rem; }
+  .vl2-sla-lbl { font-family:var(--font-mono); font-size:.73rem; font-weight:700; }
+  .vl2-sla-lbl.ok{color:var(--forest)} .vl2-sla-lbl.warn{color:var(--mustard-deep)} .vl2-sla-lbl.danger{color:#bf4d4d}
+  .vl2-track { height:7px; background:var(--pearl); border-radius:4px; overflow:hidden; width:100%; }
+  .vl2-fill  { height:100%; border-radius:4px; width:0; transition:width 1s cubic-bezier(.2,.7,.2,1) .3s; }
+  .vl2-fill.ok    { background:linear-gradient(90deg,var(--forest),var(--forest-soft)); }
+  .vl2-fill.warn  { background:linear-gradient(90deg,var(--mustard-deep),var(--mustard)); }
+  .vl2-fill.danger{ background:linear-gradient(90deg,#bf4d4d,#e06060); }
+
+  /* Modal */
+  .vac2-backdrop { display:none; position:fixed; inset:0; background:rgba(16,35,48,.55); backdrop-filter:blur(4px); z-index:200; align-items:center; justify-content:center; }
+  .vac2-backdrop.open { display:flex; }
+  .vac2-modal { background:var(--white); border-radius:var(--radius-lg); width:100%; max-width:560px; box-shadow:var(--shadow-lg); animation:vacModalIn .38s cubic-bezier(.2,.7,.2,1) both; max-height:92vh; overflow-y:auto; margin:1rem; }
+  .vac2-modal::-webkit-scrollbar{width:6px} .vac2-modal::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+  .vm-hd { padding:1.5rem 1.8rem 1.2rem; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; }
+  .vm-ht { font-family:var(--font-display); font-weight:700; font-size:1.15rem; color:var(--ink); margin:0; }
+  .vm-close { background:var(--pearl); border:none; border-radius:8px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--slate); transition:all .2s; }
+  .vm-close:hover { background:rgba(191,77,77,.1); color:#bf4d4d; }
+  .vm-body { padding:1.5rem 1.8rem; display:flex; flex-direction:column; gap:1.2rem; }
+  .vm-field { display:flex; flex-direction:column; gap:.45rem; }
+  .vm-lbl { font-size:.78rem; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; }
+  .vm-sel,.vm-inp { padding:.75rem .95rem; border:1.5px solid var(--line); border-radius:var(--radius-sm); font-size:.9rem; font-family:inherit; color:var(--ink); background:var(--white); transition:border-color .2s,box-shadow .2s; outline:none; }
+  .vm-sel:focus,.vm-inp:focus { border-color:var(--forest-soft); box-shadow:0 0 0 3px rgba(63,102,87,.1); }
+  .vm-pgrid { display:grid; grid-template-columns:1fr 1fr; gap:.7rem; }
+  .vm-pcard { padding:.9rem; border:1.5px solid var(--line); border-radius:var(--radius-sm); cursor:pointer; transition:all .25s; display:flex; flex-direction:column; gap:.3rem; }
+  .vm-pcard:hover { border-color:rgba(63,102,87,.4); background:rgba(63,102,87,.02); }
+  .vm-pcard.sel { border-color:var(--forest); background:rgba(63,102,87,.06); box-shadow:0 0 0 2px rgba(63,102,87,.12); }
+  .vm-pt { font-weight:700; font-size:.85rem; color:var(--ink); }
+  .vm-pm { font-size:.73rem; color:var(--slate); }
+  .vm-pb { font-size:.66rem; font-weight:700; padding:.15rem .45rem; border-radius:4px; width:fit-content; margin-top:.1rem; }
+  .vm-pb.ops{background:rgba(63,102,87,.1);color:var(--forest)} .vm-pb.adm{background:rgba(27,58,77,.07);color:var(--ink)} .vm-pb.com{background:rgba(217,164,65,.15);color:var(--mustard-deep)}
+  .vm-ft { padding:1rem 1.8rem 1.5rem; display:flex; gap:.8rem; justify-content:flex-end; border-top:1px solid var(--line); }
+  .vm-cancel { padding:.75rem 1.4rem; border:1.5px solid var(--line); border-radius:var(--radius-sm); background:var(--white); font-size:.88rem; font-weight:600; font-family:inherit; color:var(--slate); cursor:pointer; transition:all .2s; }
+  .vm-cancel:hover { border-color:var(--ink); color:var(--ink); }
+  .vm-create { padding:.75rem 1.6rem; background:var(--ink); color:var(--white); border:none; border-radius:var(--radius-sm); font-size:.88rem; font-weight:700; font-family:inherit; cursor:pointer; transition:all .2s; box-shadow:0 4px 14px rgba(27,58,77,.2); display:flex; align-items:center; gap:.5rem; }
+  .vm-create:hover { background:var(--ink-soft); box-shadow:0 8px 20px rgba(27,58,77,.28); transform:translateY(-1px); }
+  .vm-create:active { transform:scale(.97); }
+
+  .v2-hidden { display:none !important; }
+
+  @media(max-width:900px){ .vac2-kpi-row{gap:1.4rem} .vac2-hero{flex-direction:column;align-items:flex-start} }
+  /* Removido media query de 700px que ocultaba columnas, en su lugar usamos scroll horizontal */
+  .vac2-list-scroll { overflow-x: auto; }
+  .vac2-list-inner { min-width: 800px; }
 </style>
 
-<div class="vac-wrapper">
-  
-  <!-- Header -->
-  <div class="vac-top">
-    <div class="vac-stats">
-      <div class="vac-stat">
-        <span class="vac-stat-val">12</span>
-        <span class="vac-stat-lbl">Vacantes Activas</span>
+<!-- Modal -->
+<div class="vac2-backdrop" id="vacModal">
+  <div class="vac2-modal" role="dialog" aria-modal="true" aria-labelledby="vmTitle">
+    <div class="vm-hd">
+      <h2 class="vm-ht" id="vmTitle">Nueva Vacante</h2>
+      <button class="vm-close" id="vmClose" aria-label="Cerrar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="vm-body">
+      <div class="vm-field">
+        <label class="vm-lbl">Seleccionar perfil de cargo</label>
+        <div class="vm-pgrid" id="vmPGrid">
+          <div class="vm-pcard" data-profile="Operario de Desposte"><span class="vm-pt">Operario de Desposte</span><span class="vm-pm">Planta · Operaciones</span><span class="vm-pb ops">Operativo</span></div>
+          <div class="vm-pcard" data-profile="Asesor Comercial"><span class="vm-pt">Asesor Comercial</span><span class="vm-pm">Tiendas · Ventas</span><span class="vm-pb com">Comercial</span></div>
+          <div class="vm-pcard" data-profile="Auxiliar de Calidad"><span class="vm-pt">Auxiliar de Calidad</span><span class="vm-pm">Planta · Calidad</span><span class="vm-pb ops">Operativo</span></div>
+          <div class="vm-pcard" data-profile="Analista Contable"><span class="vm-pt">Analista Contable</span><span class="vm-pm">Sede · Administrativo</span><span class="vm-pb adm">Administrativo</span></div>
+          <div class="vm-pcard" data-profile="Gerente de Tienda"><span class="vm-pt">Gerente de Tienda</span><span class="vm-pm">Tiendas · Dirección</span><span class="vm-pb com">Comercial</span></div>
+          <div class="vm-pcard" data-profile="Técnico Mantenimiento"><span class="vm-pt">Técnico Mantenimiento</span><span class="vm-pm">Planta · Industrial</span><span class="vm-pb ops">Operativo</span></div>
+        </div>
       </div>
-      <div class="vac-stat">
-        <span class="vac-stat-val" style="color:var(--forest)">48</span>
-        <span class="vac-stat-lbl">Candidatos Activos</span>
+      <div class="vm-field">
+        <label class="vm-lbl" for="vmSede">Sede / Ubicación</label>
+        <select class="vm-sel" id="vmSede"><option value="">Selecciona una sede...</option><option>Planta Norte</option><option>Planta Sur</option><option>Planta Central</option><option>Tienda Centro</option><option>Sede Norte</option><option>Sede Central</option></select>
       </div>
-      <div class="vac-stat">
-        <span class="vac-stat-val" style="color:#bf4d4d">3</span>
-        <span class="vac-stat-lbl">Alertas SLA</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.9rem">
+        <div class="vm-field">
+          <label class="vm-lbl" for="vmCupos">Número de cupos</label>
+          <input type="number" class="vm-inp" id="vmCupos" placeholder="Ej: 3" min="1" max="50">
+        </div>
+        <div class="vm-field">
+          <label class="vm-lbl" for="vmSLA">SLA de cierre (días)</label>
+          <input type="number" class="vm-inp" id="vmSLA" placeholder="Ej: 21" min="5" max="90" value="21">
+        </div>
       </div>
     </div>
-    
-    <div class="vac-actions">
-      <div class="view-toggle">
-        <button class="vt-btn active" id="btnViewKanban" aria-label="Vista Kanban">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-        </button>
-        <button class="vt-btn" id="btnViewList" aria-label="Vista Lista">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-        </button>
+    <div class="vm-ft">
+      <button class="vm-cancel" id="vmCancel">Cancelar</button>
+      <button class="vm-create" id="vmCreate">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Crear Vacante
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="vac2-wrapper">
+
+  <!-- Hero -->
+  <div class="vac2-hero">
+    <div class="vac2-hero-left">
+      <p class="vac2-hero-eyebrow"><span class="vac2-hero-dot"></span>Gestión Operativa · Tiempo Real</p>
+      <h2 class="vac2-hero-title">Vacantes Activas</h2>
+    </div>
+    <div class="vac2-kpi-row">
+      <div class="vac2-kpi"><span class="vac2-kpi-val accent" id="kpiV1">0</span><span class="vac2-kpi-lbl">Vacantes</span></div>
+      <div class="vac2-kpi-div"></div>
+      <div class="vac2-kpi"><span class="vac2-kpi-val good" id="kpiV2">0</span><span class="vac2-kpi-lbl">Candidatos activos</span></div>
+      <div class="vac2-kpi-div"></div>
+      <div class="vac2-kpi"><span class="vac2-kpi-val danger" id="kpiV3">0</span><span class="vac2-kpi-lbl">Alertas SLA</span></div>
+      <div class="vac2-kpi-div"></div>
+      <div class="vac2-kpi"><span class="vac2-kpi-val" id="kpiV4">0</span><span class="vac2-kpi-lbl">Score IA prom.</span></div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="vac2-controls">
+    <div class="vac2-view-group">
+      <button class="vac2-vbtn active" id="v2Kanban">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Kanban
+      </button>
+      <button class="vac2-vbtn" id="v2List">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg> Lista
+      </button>
+    </div>
+    <div class="vac2-right-ctrls">
+      <div class="vac2-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--slate-light)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="vacSearchQ" placeholder="Buscar vacante o candidato…">
       </div>
-      <button class="btn-new-vac">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <button class="vac2-btn-new" id="v2NewBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Nueva Vacante
       </button>
     </div>
   </div>
 
-  <!-- Kanban View -->
-  <div class="vac-board" id="viewKanban">
-    <!-- Col 1: Pre-filtrado -->
-    <div class="vac-col">
-      <div class="vac-col-head">
-        <h4 class="vac-col-title">Pre-filtrado (Sora)</h4>
-        <span class="vac-col-count">8</span>
-      </div>
-      
-      <div class="v-card sla-ok">
-        <div class="vc-top">
-          <div>
-            <h5 class="vc-title">Operario de Desposte</h5>
-            <p class="vc-sub">Planta Norte · Hace 2h</p>
-          </div>
-          <span class="vc-score hi">94 IA</span>
-        </div>
-        <div class="vc-mid">
-          <span class="vc-badge" style="background:rgba(63,102,87,.1);color:var(--forest);">Sora Validado</span>
-          <span class="vc-badge">Exp. 2 años</span>
-        </div>
-        <div class="vc-bot">
-          <div class="vc-cand"><div class="vc-av" style="background:var(--ink-deep)">LM</div><span class="vc-cand-name">Luis Mendoza</span></div>
-          <div class="vc-time"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 2h</div>
-        </div>
-      </div>
-      
-      <div class="v-card sla-ok">
-        <div class="vc-top">
-          <div>
-            <h5 class="vc-title">Asesor Comercial</h5>
-            <p class="vc-sub">Tienda Centro · Hace 5h</p>
-          </div>
-          <span class="vc-score">82 IA</span>
-        </div>
-        <div class="vc-mid">
-          <span class="vc-badge">Sora Evaluando...</span>
-        </div>
-        <div class="vc-bot">
-          <div class="vc-cand"><div class="vc-av">AM</div><span class="vc-cand-name">Ana Morales</span></div>
-          <div class="vc-time"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 5h</div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Col 2: Aplica al perfil -->
-    <div class="vac-col">
-      <div class="vac-col-head">
-        <h4 class="vac-col-title">Aplica al Perfil</h4>
-        <span class="vac-col-count">5</span>
-      </div>
-      
-      <div class="v-card sla-warn">
-        <div class="vc-top">
-          <div>
-            <h5 class="vc-title">Auxiliar de Calidad</h5>
-            <p class="vc-sub">Planta Sur · Hace 2d</p>
-          </div>
-          <span class="vc-score hi">89 IA</span>
-        </div>
-        <div class="vc-mid">
-          <span class="vc-badge" style="background:rgba(217,164,65,.15);color:var(--mustard-deep);">Req. Agendamiento</span>
-        </div>
-        <div class="vc-bot">
-          <div class="vc-cand"><div class="vc-av" style="background:#5C8473">RC</div><span class="vc-cand-name">Roberto Castro</span></div>
-          <div class="vc-time imminent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 2d sin mov.</div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Col 3: Agendado -->
-    <div class="vac-col">
-      <div class="vac-col-head">
-        <h4 class="vac-col-title">Agendado</h4>
-        <span class="vac-col-count">4</span>
-      </div>
-      
-      <div class="v-card sla-ok">
-        <div class="vc-top">
-          <div>
-            <h5 class="vc-title">Gerente de Tienda</h5>
-            <p class="vc-sub">Sede Norte · Hoy 14:00</p>
-          </div>
-          <span class="vc-score hi">96 IA</span>
-        </div>
-        <div class="vc-mid">
-          <span class="vc-badge" style="background:rgba(63,102,87,.1);color:var(--forest);">Sora Confirmado</span>
-        </div>
-        <div class="vc-bot">
-          <div class="vc-cand"><div class="vc-av" style="background:var(--mustard-deep)">DR</div><span class="vc-cand-name">Diana Rojas</span></div>
-          <div class="vc-time" style="color:var(--forest)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> en 3h</div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Col 4: Entrevistado -->
-    <div class="vac-col">
-      <div class="vac-col-head">
-        <h4 class="vac-col-title">Entrevistado</h4>
-        <span class="vac-col-count">2</span>
-      </div>
-      
-      <div class="v-card sla-danger">
-        <div class="vc-top">
-          <div>
-            <h5 class="vc-title">Técnico Mantenimiento</h5>
-            <p class="vc-sub">Planta Central · Hace 5d</p>
-          </div>
-          <span class="vc-score lo">78 IA</span>
-        </div>
-        <div class="vc-mid">
-          <span class="vc-badge">Falta Decisión</span>
-          <span class="vc-badge">Ref. Verificadas</span>
-        </div>
-        <div class="vc-bot">
-          <div class="vc-cand"><div class="vc-av" style="background:var(--ink-deep)">JP</div><span class="vc-cand-name">Juan Pérez</span></div>
-          <div class="vc-time late"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 5d sin mov.</div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Col 5: Contratación -->
-    <div class="vac-col">
-      <div class="vac-col-head">
-        <h4 class="vac-col-title">Contratación</h4>
-        <span class="vac-col-count">3</span>
-      </div>
-      
-      <div class="v-card sla-ok">
-        <div class="vc-top">
-          <div>
-            <h5 class="vc-title">Analista Contable</h5>
-            <p class="vc-sub">Sede Central · En firmas</p>
-          </div>
-          <span class="vc-score hi">91 IA</span>
-        </div>
-        <div class="vc-mid">
-          <span class="vc-badge" style="background:rgba(217,164,65,.15);color:var(--mustard-deep);">Docs. Recibidos</span>
-        </div>
-        <div class="vc-bot">
-          <div class="vc-cand"><div class="vc-av" style="background:var(--forest)">SM</div><span class="vc-cand-name">Sofía Medina</span></div>
-          <div class="vc-time"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Listo</div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- ====== KANBAN ====== -->
+  <div class="vac2-board" id="v2KanbanView">
 
-  <!-- List View -->
-  <div class="vac-list-view hidden" id="viewList">
-    <div class="vl-head">
-      <div>Vacante</div>
-      <div>Mejor Candidato</div>
-      <div>Score IA</div>
-      <div>Estado / Fase</div>
-      <div>SLA / Días sin mov.</div>
-    </div>
-    
-    <div class="vl-row">
-      <div class="vl-info">
-        <p class="vl-title">Operario de Desposte</p>
-        <p class="vl-sub">Planta Norte</p>
+    <!-- Pre-filtrado -->
+    <div class="vac2-col col-pref">
+      <div class="vac2-col-hd">
+        <div class="vac2-col-nm"><span class="vac2-col-dot"></span><span class="vac2-col-name">Pre-filtrado</span></div>
+        <span class="vac2-col-cnt">8</span>
       </div>
-      <div class="vl-cand"><div class="vc-av" style="background:var(--ink-deep)">LM</div> Luis Mendoza</div>
-      <div><span class="vc-score hi">94 IA</span></div>
-      <div><span class="vc-badge" style="background:rgba(63,102,87,.1);color:var(--forest);">Pre-filtrado</span></div>
-      <div>
-        <span style="font-size:.8rem; font-family:var(--font-mono); font-weight:600;">2 horas</span>
-        <div class="sla-bar-bg"><div class="sla-bar-fill sla-ok-bg" style="width:5%"></div></div>
-      </div>
-    </div>
-    
-    <div class="vl-row">
-      <div class="vl-info">
-        <p class="vl-title">Auxiliar de Calidad</p>
-        <p class="vl-sub">Planta Sur</p>
-      </div>
-      <div class="vl-cand"><div class="vc-av" style="background:#5C8473">RC</div> Roberto Castro</div>
-      <div><span class="vc-score hi">89 IA</span></div>
-      <div><span class="vc-badge" style="background:rgba(217,164,65,.15);color:var(--mustard-deep);">Aplica al Perfil</span></div>
-      <div>
-        <span style="font-size:.8rem; font-family:var(--font-mono); font-weight:600; color:var(--mustard-deep)">2 días</span>
-        <div class="sla-bar-bg"><div class="sla-bar-fill sla-warn-bg" style="width:60%"></div></div>
-      </div>
-    </div>
-    
-    <div class="vl-row">
-      <div class="vl-info">
-        <p class="vl-title">Gerente de Tienda</p>
-        <p class="vl-sub">Sede Norte</p>
-      </div>
-      <div class="vl-cand"><div class="vc-av" style="background:var(--mustard-deep)">DR</div> Diana Rojas</div>
-      <div><span class="vc-score hi">96 IA</span></div>
-      <div><span class="vc-badge" style="background:rgba(63,102,87,.1);color:var(--forest);">Agendado</span></div>
-      <div>
-        <span style="font-size:.8rem; font-family:var(--font-mono); font-weight:600;">En 3 horas</span>
-        <div class="sla-bar-bg"><div class="sla-bar-fill sla-ok-bg" style="width:10%"></div></div>
+      <div class="vac2-col-body">
+        <div class="vk-card sla-ok" style="animation-delay:.18s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Operario de Desposte</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Norte · hace 2h</p></div>
+              <span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>94</span>
+            </div>
+            <div class="vk-think"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Sora evaluando<span></span><span></span><span></span></div>
+            <div class="vk-badges"><span class="vk-badge green">Sora Validado</span><span class="vk-badge gray">4 años exp.</span><span class="vk-badge blue">Turno OK</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#2C4F66">LM</div><span class="vk-cname">Luis Mendoza</span></div><span class="vk-time good"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>2h</span></div>
+          </div>
+        </div>
+        <div class="vk-card sla-ok" style="animation-delay:.26s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Asesor Comercial</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Tienda Centro · hace 5h</p></div>
+              <span class="vk-score mid"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>82</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge yellow">En evaluación</span><span class="vk-badge gray">Bilingüe</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#5C8473">AM</div><span class="vk-cname">Ana Morales</span></div><span class="vk-time"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>5h</span></div>
+          </div>
+        </div>
+        <div class="vk-card sla-ok" style="animation-delay:.34s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Técnico Electrónico</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Sur · hace 8h</p></div>
+              <span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>91</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge green">Perfil exacto</span><span class="vk-badge blue">Cert. SENA</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#8a4da2">PV</div><span class="vk-cname">Pedro Vásquez</span></div><span class="vk-time good"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>8h</span></div>
+          </div>
+        </div>
       </div>
     </div>
-    
-    <div class="vl-row">
-      <div class="vl-info">
-        <p class="vl-title">Técnico Mantenimiento</p>
-        <p class="vl-sub">Planta Central</p>
-      </div>
-      <div class="vl-cand"><div class="vc-av" style="background:var(--ink-deep)">JP</div> Juan Pérez</div>
-      <div><span class="vc-score lo">78 IA</span></div>
-      <div><span class="vc-badge">Entrevistado</span></div>
-      <div>
-        <span style="font-size:.8rem; font-family:var(--font-mono); font-weight:600; color:#bf4d4d">5 días</span>
-        <div class="sla-bar-bg"><div class="sla-bar-fill sla-danger-bg" style="width:95%"></div></div>
-      </div>
-    </div>
-    
-    <div class="vl-row">
-      <div class="vl-info">
-        <p class="vl-title">Analista Contable</p>
-        <p class="vl-sub">Sede Central</p>
-      </div>
-      <div class="vl-cand"><div class="vc-av" style="background:var(--forest)">SM</div> Sofía Medina</div>
-      <div><span class="vc-score hi">91 IA</span></div>
-      <div><span class="vc-badge">Contratación</span></div>
-      <div>
-        <span style="font-size:.8rem; font-family:var(--font-mono); font-weight:600; color:var(--forest)">Listo</span>
-        <div class="sla-bar-bg"><div class="sla-bar-fill sla-ok-bg" style="width:100%"></div></div>
-      </div>
-    </div>
-    
-  </div>
 
-</div>
-  `;
+    <!-- Aplica al Perfil -->
+    <div class="vac2-col col-aplica">
+      <div class="vac2-col-hd">
+        <div class="vac2-col-nm"><span class="vac2-col-dot"></span><span class="vac2-col-name">Aplica al Perfil</span></div>
+        <span class="vac2-col-cnt">5</span>
+      </div>
+      <div class="vac2-col-body">
+        <div class="vk-card sla-warn" style="animation-delay:.22s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Auxiliar de Calidad</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Sur · hace 2d</p></div>
+              <span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>89</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge yellow">Req. Agendamiento</span><span class="vk-badge gray">ISO 9001</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#5C8473">RC</div><span class="vk-cname">Roberto Castro</span></div><span class="vk-time imminent"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>2d sin mov.</span></div>
+          </div>
+        </div>
+        <div class="vk-card sla-ok" style="animation-delay:.30s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Jefe de Producción</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Central · hace 1d</p></div>
+              <span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>87</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge blue">Revisar CV</span><span class="vk-badge purple">Liderazgo</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#B9842B">MR</div><span class="vk-cname">Miguel Rincón</span></div><span class="vk-time"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>1d</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agendado -->
+    <div class="vac2-col col-agenda">
+      <div class="vac2-col-hd">
+        <div class="vac2-col-nm"><span class="vac2-col-dot"></span><span class="vac2-col-name">Agendado</span></div>
+        <span class="vac2-col-cnt">4</span>
+      </div>
+      <div class="vac2-col-body">
+        <div class="vk-card sla-ok" style="animation-delay:.24s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Gerente de Tienda</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Sede Norte · Hoy 14:00</p></div>
+              <span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>96</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge green">Confirmado</span><span class="vk-badge yellow">Hoy 14:00</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#B9842B">DR</div><span class="vk-cname">Diana Rojas</span></div><span class="vk-time good"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>en 3h</span></div>
+          </div>
+        </div>
+        <div class="vk-card sla-ok" style="animation-delay:.32s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Auxiliar Logística</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Norte · Mañana 09:00</p></div>
+              <span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>85</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge green">Sora Confirmado</span><span class="vk-badge gray">Virtual</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#254d66">CL</div><span class="vk-cname">Camila López</span></div><span class="vk-time good"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>mañana</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Entrevistado -->
+    <div class="vac2-col col-entrev">
+      <div class="vac2-col-hd">
+        <div class="vac2-col-nm"><span class="vac2-col-dot"></span><span class="vac2-col-name">Entrevistado</span></div>
+        <span class="vac2-col-cnt">2</span>
+      </div>
+      <div class="vac2-col-body">
+        <div class="vk-card sla-danger" style="animation-delay:.26s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Técnico Mantenimiento</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Central · hace 5d</p></div>
+              <span class="vk-score lo"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>78</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge red">⚠ SLA Vencido</span><span class="vk-badge gray">Falta Decisión</span><span class="vk-badge gray">Ref. Verif.</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#1B3A4D">JP</div><span class="vk-cname">Juan Pérez</span></div><span class="vk-time late"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>5d sin mov.</span></div>
+          </div>
+        </div>
+        <div class="vk-card sla-warn" style="animation-delay:.34s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Coord. RRHH</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Sede Central · hace 3d</p></div>
+              <span class="vk-score mid"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>83</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge yellow">En evaluación</span><span class="vk-badge purple">Senior</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#8a4da2">LG</div><span class="vk-cname">Laura González</span></div><span class="vk-time imminent"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>3d sin mov.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contratación -->
+    <div class="vac2-col col-contrat">
+      <div class="vac2-col-hd">
+        <div class="vac2-col-nm"><span class="vac2-col-dot"></span><span class="vac2-col-name">Contratación</span></div>
+        <span class="vac2-col-cnt">3</span>
+      </div>
+      <div class="vac2-col-body">
+        <div class="vk-card sla-ok" style="animation-delay:.28s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Analista Contable</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Sede Central · En firmas</p></div>
+              <span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>91</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge green">Docs. Recibidos</span><span class="vk-badge yellow">Firma Pendiente</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#3F6657">SM</div><span class="vk-cname">Sofía Medina</span></div><span class="vk-time good"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Listo</span></div>
+          </div>
+        </div>
+        <div class="vk-card sla-ok" style="animation-delay:.36s">
+          <div class="vk-inner">
+            <div class="vk-top">
+              <div class="vk-tw"><h5 class="vk-title">Auxiliar Administrativo</h5><p class="vk-loc"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Sede Norte · Inicio 23 jun.</p></div>
+              <span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>88</span>
+            </div>
+            <div class="vk-badges"><span class="vk-badge green">Contrato Firmado</span><span class="vk-badge blue">Onboarding</span></div>
+            <div class="vk-cand"><div class="vk-ci"><div class="vk-av" style="background:#335d55">VC</div><span class="vk-cname">Valentina Cruz</span></div><span class="vk-time good"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Completado</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end board -->
+
+  <!-- ====== LIST VIEW ====== -->
+  <div class="vac2-list v2-hidden" id="v2ListView">
+    <div class="vl2-tb">
+      <div class="vl2-sg">
+        <span class="vl2-sg-lbl">Ordenar:</span>
+        <button class="vl2-sb active" data-sort="dias"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg>Días sin mov.</button>
+        <button class="vl2-sb" data-sort="score"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Score IA</button>
+        <button class="vl2-sb" data-sort="fase">Fase</button>
+      </div>
+      <span class="vl2-cnt">7 vacantes activas</span>
+    </div>
+    <div class="vac2-list-scroll">
+      <div class="vac2-list-inner">
+        <div class="vl2-hd"><div>Vacante</div><div>Candidato top</div><div>Score IA</div><div>Fase</div><div>SLA / Días sin mov.</div></div>
+    <div class="vl2-row" data-dias="5" data-score="78" data-fase="3">
+      <div><p class="vl2-title">Técnico Mantenimiento</p><p class="vl2-sub"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Central</p></div>
+      <div class="vl2-cand"><div class="vk-av" style="background:#1B3A4D">JP</div>Juan Pérez</div>
+      <div><span class="vk-score lo"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>78</span></div>
+      <div><span class="vl2-ph p3">Entrevistado</span></div>
+      <div class="vl2-sla"><span class="vl2-sla-lbl danger">5 días · SLA crítico</span><div class="vl2-track"><div class="vl2-fill danger" data-fill="95%"></div></div></div>
+    </div>
+    <div class="vl2-row" data-dias="3" data-score="83" data-fase="3">
+      <div><p class="vl2-title">Coord. Recursos Humanos</p><p class="vl2-sub"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Sede Central</p></div>
+      <div class="vl2-cand"><div class="vk-av" style="background:#8a4da2">LG</div>Laura González</div>
+      <div><span class="vk-score mid"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>83</span></div>
+      <div><span class="vl2-ph p3">Entrevistado</span></div>
+      <div class="vl2-sla"><span class="vl2-sla-lbl warn">3 días · atención</span><div class="vl2-track"><div class="vl2-fill warn" data-fill="60%"></div></div></div>
+    </div>
+    <div class="vl2-row" data-dias="2" data-score="89" data-fase="1">
+      <div><p class="vl2-title">Auxiliar de Calidad</p><p class="vl2-sub"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Sur</p></div>
+      <div class="vl2-cand"><div class="vk-av" style="background:#5C8473">RC</div>Roberto Castro</div>
+      <div><span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>89</span></div>
+      <div><span class="vl2-ph p1">Aplica al Perfil</span></div>
+      <div class="vl2-sla"><span class="vl2-sla-lbl warn">2 días sin mov.</span><div class="vl2-track"><div class="vl2-fill warn" data-fill="40%"></div></div></div>
+    </div>
+    <div class="vl2-row" data-dias="1" data-score="87" data-fase="1">
+      <div><p class="vl2-title">Jefe de Producción</p><p class="vl2-sub"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Central</p></div>
+      <div class="vl2-cand"><div class="vk-av" style="background:#B9842B">MR</div>Miguel Rincón</div>
+      <div><span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>87</span></div>
+      <div><span class="vl2-ph p1">Aplica al Perfil</span></div>
+      <div class="vl2-sla"><span class="vl2-sla-lbl ok">1 día · en plazo</span><div class="vl2-track"><div class="vl2-fill ok" data-fill="18%"></div></div></div>
+    </div>
+    <div class="vl2-row" data-dias="0" data-score="96" data-fase="2">
+      <div><p class="vl2-title">Gerente de Tienda</p><p class="vl2-sub"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Sede Norte</p></div>
+      <div class="vl2-cand"><div class="vk-av" style="background:#B9842B">DR</div>Diana Rojas</div>
+      <div><span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>96</span></div>
+      <div><span class="vl2-ph p2">Agendado</span></div>
+      <div class="vl2-sla"><span class="vl2-sla-lbl ok">Hoy · en plazo</span><div class="vl2-track"><div class="vl2-fill ok" data-fill="8%"></div></div></div>
+    </div>
+    <div class="vl2-row" data-dias="0" data-score="94" data-fase="0">
+      <div><p class="vl2-title">Operario de Desposte</p><p class="vl2-sub"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Planta Norte</p></div>
+      <div class="vl2-cand"><div class="vk-av" style="background:#2C4F66">LM</div>Luis Mendoza</div>
+      <div><span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>94</span></div>
+      <div><span class="vl2-ph p0">Pre-filtrado</span></div>
+      <div class="vl2-sla"><span class="vl2-sla-lbl ok">2h · en plazo</span><div class="vl2-track"><div class="vl2-fill ok" data-fill="4%"></div></div></div>
+    </div>
+    <div class="vl2-row" data-dias="0" data-score="91" data-fase="4">
+      <div><p class="vl2-title">Analista Contable</p><p class="vl2-sub"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Sede Central</p></div>
+      <div class="vl2-cand"><div class="vk-av" style="background:#3F6657">SM</div>Sofía Medina</div>
+      <div><span class="vk-score hi"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>91</span></div>
+      <div><span class="vl2-ph p4">Contratación</span></div>
+      <div class="vl2-sla"><span class="vl2-sla-lbl ok">Listo</span><div class="vl2-track"><div class="vl2-fill ok" data-fill="100%"></div></div></div>
+    </div>
+      </div><!-- end inner -->
+    </div><!-- end scroll -->
+  </div><!-- end list -->
+
+</div><!-- end wrapper -->
+`;
 }
 
 function postRenderVacantes() {
-  const btnKanban = document.getElementById('btnViewKanban');
-  const btnList = document.getElementById('btnViewList');
-  const viewKanban = document.getElementById('viewKanban');
-  const viewList = document.getElementById('viewList');
-
-  if(btnKanban && btnList && viewKanban && viewList) {
-    btnKanban.addEventListener('click', () => {
-      btnKanban.classList.add('active');
-      btnList.classList.remove('active');
-      viewList.classList.add('hidden');
-      viewKanban.classList.remove('hidden');
-    });
-
-    btnList.addEventListener('click', () => {
-      btnList.classList.add('active');
-      btnKanban.classList.remove('active');
-      viewKanban.classList.add('hidden');
-      viewList.classList.remove('hidden');
-    });
+  // KPI counters
+  function ac(id, end, dur) {
+    var el = document.getElementById(id); if (!el) return;
+    var t0 = performance.now();
+    (function s(n) {
+      var p = Math.min((n - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(end * e);
+      if (p < 1) requestAnimationFrame(s);
+    })(performance.now());
   }
+  ac('kpiV1', 12, 900); ac('kpiV2', 48, 1100); ac('kpiV3', 3, 700); ac('kpiV4', 88, 1200);
+
+  // View toggle
+  var bK = document.getElementById('v2Kanban');
+  var bL = document.getElementById('v2List');
+  var vK = document.getElementById('v2KanbanView');
+  var vL = document.getElementById('v2ListView');
+
+  function showK() { bK.classList.add('active'); bL.classList.remove('active'); vL.classList.add('v2-hidden'); vK.classList.remove('v2-hidden'); }
+  function showL() {
+    bL.classList.add('active'); bK.classList.remove('active'); vK.classList.add('v2-hidden'); vL.classList.remove('v2-hidden');
+    setTimeout(function() { document.querySelectorAll('.vl2-fill[data-fill]').forEach(function(b) { b.style.width = b.dataset.fill; }); }, 120);
+  }
+  if (bK) bK.addEventListener('click', showK);
+  if (bL) bL.addEventListener('click', showL);
+
+  // Sorting
+  document.querySelectorAll('.vl2-sb').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.vl2-sb').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var sort = btn.dataset.sort;
+      var lv = document.getElementById('v2ListView'); if (!lv) return;
+      var rows = Array.from(lv.querySelectorAll('.vl2-row'));
+      rows.sort(function(a, b) {
+        if (sort === 'dias')  return +b.dataset.dias  - +a.dataset.dias;
+        if (sort === 'score') return +b.dataset.score - +a.dataset.score;
+        if (sort === 'fase')  return +a.dataset.fase  - +b.dataset.fase;
+        return 0;
+      });
+      rows.forEach(function(r, i) {
+        r.style.opacity = '0'; r.style.transition = 'none';
+        setTimeout(function() { lv.appendChild(r); requestAnimationFrame(function() { r.style.transition = 'opacity .3s,transform .3s'; r.style.opacity = '1'; }); }, i * 55);
+      });
+    });
+  });
+
+  // Search
+  var sq = document.getElementById('vacSearchQ');
+  if (sq) sq.addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    document.querySelectorAll('.vk-card').forEach(function(c) {
+      var m = c.textContent.toLowerCase().includes(q);
+      c.style.opacity = m ? '1' : '0.22'; c.style.transform = m ? '' : 'scale(.97)'; c.style.transition = 'opacity .25s,transform .25s';
+    });
+    document.querySelectorAll('.vl2-row').forEach(function(r) {
+      r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+
+  // Modal
+  var modal = document.getElementById('vacModal');
+  var pg    = document.getElementById('vmPGrid');
+  var selPr = null;
+  function open()  { if (modal) modal.classList.add('open'); }
+  function close() { if (modal) { modal.classList.remove('open'); selPr = null; if (pg) pg.querySelectorAll('.vm-pcard').forEach(function(c){c.classList.remove('sel');}); } }
+  var nb = document.getElementById('v2NewBtn'); if (nb) nb.addEventListener('click', open);
+  var vc = document.getElementById('vmClose');  if (vc) vc.addEventListener('click', close);
+  var ca = document.getElementById('vmCancel'); if (ca) ca.addEventListener('click', close);
+  if (modal) modal.addEventListener('click', function(e){ if(e.target===modal) close(); });
+  if (pg) pg.querySelectorAll('.vm-pcard').forEach(function(c) {
+    c.addEventListener('click', function() { pg.querySelectorAll('.vm-pcard').forEach(function(x){x.classList.remove('sel');}); c.classList.add('sel'); selPr = c.dataset.profile; });
+  });
+  var cr = document.getElementById('vmCreate');
+  if (cr) cr.addEventListener('click', function() {
+    if (!selPr) { if (pg) { pg.style.outline='2px solid #bf4d4d'; pg.style.borderRadius='8px'; setTimeout(function(){pg.style.outline='';},1200); } return; }
+    var orig = cr.innerHTML;
+    cr.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Creando\u2026';
+    cr.style.background = 'var(--forest)';
+    setTimeout(function() {
+      var name = selPr; close(); cr.innerHTML = orig; cr.style.background = '';
+      var t = document.createElement('div');
+      t.style.cssText = 'position:fixed;bottom:28px;right:28px;background:var(--forest);color:#fff;padding:1rem 1.5rem;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:300;font-size:.88rem;font-weight:600;display:flex;align-items:center;gap:.6rem;animation:vacEnter .35s forwards';
+      t.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Vacante \u00ab' + name + '\u00bb creada exitosamente';
+      document.body.appendChild(t);
+      setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(function(){t.remove();},320);},3200);
+    }, 900);
+  });
 }
+
 
 function getChatHTML() {
   return `
@@ -1376,6 +1641,12 @@ function getChatHTML() {
   .cs-search { display: flex; align-items: center; background: var(--pearl); border-radius: 20px; padding: .5rem .8rem; gap: .5rem; }
   .cs-search input { border: none; background: transparent; outline: none; font-size: .85rem; width: 100%; color: var(--ink); }
   .cs-search input::placeholder { color: var(--slate-light); }
+  
+  .cs-filters { display: flex; gap: .5rem; padding: .6rem 1.2rem; border-bottom: 1px solid var(--line); overflow-x: auto; flex-shrink: 0; background: #fdfdfc; }
+  .cs-filters::-webkit-scrollbar { height: 6px; display: block; } .cs-filters::-webkit-scrollbar-track { background: transparent; } .cs-filters::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; } .cs-filters::-webkit-scrollbar-thumb:hover { background: rgba(63,102,87,.3); }
+  .cs-filter-chip { font-size: .7rem; font-weight: 600; padding: .3rem .7rem; border-radius: 20px; border: 1px solid var(--line); background: var(--white); color: var(--slate); cursor: pointer; transition: all .2s; white-space: nowrap; }
+  .cs-filter-chip:hover { border-color: rgba(63,102,87,.3); background: rgba(63,102,87,.03); }
+  .cs-filter-chip.active { background: var(--ink); color: var(--white); border-color: var(--ink); box-shadow: var(--shadow-sm); }
   
   .cs-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
   .cs-list::-webkit-scrollbar { width: 6px; }
@@ -1433,6 +1704,12 @@ function getChatHTML() {
   
   .msg-sys { align-self: center; background: var(--pearl); font-size: .7rem; font-weight: 600; color: var(--slate); padding: .3rem .8rem; border-radius: 20px; margin: .5rem 0; text-transform: uppercase; letter-spacing: .02em; }
   
+  /* MANUAL TIMER CSS */
+  .manual-timer { position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; background: var(--ink); color: var(--white); padding: .5rem 1.2rem; border-radius: 20px; font-size: .8rem; font-weight: 600; display: flex; align-items: center; gap: .5rem; box-shadow: 0 4px 12px rgba(0,0,0,.15); transition: all .3s cubic-bezier(.2,.7,.2,1); pointer-events: none; z-index: 10; }
+  .manual-timer.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .manual-timer svg { color: var(--mustard-soft); }
+  .manual-timer.pulse svg { animation: vacDotBlink 1.5s infinite; }
+  
   .cm-footer { padding: 1rem 1.5rem; background: var(--white); border-top: 1px solid var(--line); display: none; gap: .8rem; align-items: center; }
   .cm-input-box { flex: 1; background: var(--pearl); border-radius: 24px; padding: .65rem 1.2rem; display: flex; align-items: center; border: 1px solid transparent; transition: border .2s; }
   .cm-input-box:focus-within { border-color: rgba(63,102,87,.3); background: var(--white); box-shadow: 0 0 0 3px rgba(63,102,87,.05); }
@@ -1477,12 +1754,19 @@ function getChatHTML() {
   .mp-contact p { display: flex; align-items: center; gap: .6rem; font-size: .85rem; color: var(--slate); margin: 0 0 .5rem; font-family: var(--font-mono); }
   .mp-contact p:last-child { margin: 0; }
   
+  .cm-back { display: none; background: transparent; border: none; padding: .4rem; margin-right: .5rem; cursor: pointer; color: var(--ink); border-radius: 8px; }
+  .cm-back:hover { background: var(--pearl); }
+
   /* Responsive Adjustments */
   @media(max-width: 1100px){
     .chat-copilot { display: none; }
   }
   @media(max-width: 768px){
-    .chat-sidebar { display: none; }
+    .chat-sidebar { width: 100%; border-right: none; }
+    .chat-main { display: none; }
+    .chat-wrapper.show-chat .chat-sidebar { display: none; }
+    .chat-wrapper.show-chat .chat-main { display: flex; width: 100%; }
+    .cm-back { display: flex; align-items: center; justify-content: center; }
   }
 </style>
 
@@ -1497,6 +1781,15 @@ function getChatHTML() {
         <input type="text" id="chatSearchInput" placeholder="Buscar candidato o vacante...">
       </div>
     </div>
+    
+    <div class="cs-filters" id="chatFilters">
+      <button class="cs-filter-chip active" data-status="all">Todos</button>
+      <button class="cs-filter-chip" data-status="sora">Sora IA</button>
+      <button class="cs-filter-chip" data-status="manual">Manual</button>
+      <button class="cs-filter-chip" data-status="wait">En Espera</button>
+      <button class="cs-filter-chip" data-status="blocked">Bloqueado</button>
+    </div>
+
     <div class="cs-list" id="chatListContainer">
       <!-- Chat items rendered via JS -->
     </div>
@@ -1505,8 +1798,12 @@ function getChatHTML() {
   <!-- Main Panel: Chat Area -->
   <div class="chat-main">
     <div class="cm-header">
-      <div class="cm-user" id="chatTopUser">
-        <div class="cm-user-av" id="chatTopAv">CM</div>
+      <div style="display:flex; align-items:center;">
+        <button class="cm-back" id="chatBackBtn" aria-label="Volver a lista">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        </button>
+        <div class="cm-user" id="chatTopUser">
+          <div class="cm-user-av" id="chatTopAv">CM</div>
         <div class="cm-user-info">
           <h3 id="chatTopName">Carlos Mendoza</h3>
           <p><span style="display:inline-block;width:7px;height:7px;background:var(--forest);border-radius:50%;"></span> En línea · Vacante: <span id="chatTopRole">Operario de Desposte</span></p>
@@ -1537,6 +1834,12 @@ function getChatHTML() {
       <!-- Messages rendered via JS -->
     </div>
     
+    <!-- TIMER HTML -->
+    <div class="manual-timer" id="manualTimer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Sora retomará el control en <span id="mtCount" style="font-family:var(--font-mono);font-size:.85rem;margin-left:.2rem;">05:00</span>
+    </div>
+
     <div class="cm-footer" id="chatFooter">
       <button class="btn-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
       <div class="cm-input-box">
@@ -1584,6 +1887,7 @@ function postRenderChat() {
     'Carlos Mendoza': {
       initials: 'CM', color: '#2C4F66', role: 'Operario de Desposte', score: '94%',
       scoreColor: 'var(--forest)', time: 'Ahora', lastMsg: 'Entendido, allí estaré puntual.',
+      status: 'sora',
       tags: ['4 años exp.', 'Turnos rotativos OK', 'Ubicación ideal'],
       warnTags: ['Falta validar higiene'],
       analysis: 'Respuestas rápidas, tono respetuoso y disposición absoluta. Confirmó experiencia en multiespecie.',
@@ -1602,19 +1906,21 @@ function postRenderChat() {
     'Laura Ríos': {
       initials: 'LR', color: '#D9A441', role: 'Auxiliar Contable', score: '88%',
       scoreColor: 'var(--mustard-deep)', time: '10:42 AM', lastMsg: 'Sí, tengo 3 años de exp.',
+      status: 'manual',
       tags: ['3 años exp.', 'Manejo SIIGO'],
       warnTags: ['Disponibilidad a convenir'],
       analysis: 'Candidata proactiva, tiene experiencia en el sector agroindustrial. Requiere un salario ligeramente superior.',
       email: 'l.rios22@email.com', phone: '+57 320 987 6543',
       messages: [
-        { type: 'sys', time: '10:30 AM', text: 'Sora AI ha contactado a la candidata' },
-        { type: 'sora', time: '10:30 AM', text: '¡Hola Laura! Somos Campuslands. Tu perfil nos pareció interesante para la vacante de Auxiliar Contable. ¿Cuántos años de experiencia tienes?' },
+        { type: 'sys', time: '10:30 AM', text: 'Control manual activado por equipo de selección' },
+        { type: 'out-human', time: '10:30 AM', text: '¡Hola Laura! Somos Campuslands. Tu perfil nos pareció interesante para la vacante de Auxiliar Contable. ¿Cuántos años de experiencia tienes?' },
         { type: 'in', time: '10:42 AM', text: 'Sí, tengo 3 años de exp.' }
       ]
     },
     'Javier Pinto': {
       initials: 'JP', color: '#5C8473', role: 'Conductor Repartidor', score: '91%',
       scoreColor: 'var(--forest)', time: 'Ayer', lastMsg: 'Perfecto, gracias.',
+      status: 'wait',
       tags: ['Pase C2 activo', 'Conoce rutas'],
       warnTags: [],
       analysis: 'Conductor experimentado. Pase al día sin multas reportadas. Dispuesto a iniciar inmediatamente.',
@@ -1623,21 +1929,21 @@ function postRenderChat() {
         { type: 'sys', time: 'Ayer', text: 'Evaluación de documentos iniciada' },
         { type: 'sora', time: 'Ayer', text: 'Hola Javier, necesitamos que nos compartas una foto de tu licencia de conducción por ambas caras, por favor.' },
         { type: 'in', time: 'Ayer', text: '[Imagen Adjunta]' },
-        { type: 'sys', time: 'Ayer', text: 'Documento verificado correctamente por Sora AI' },
-        { type: 'sora', time: 'Ayer', text: 'Hemos validado tu licencia C2 exitosamente. Te estaremos llamando mañana.' },
-        { type: 'in', time: 'Ayer', text: 'Perfecto, gracias.' }
+        { type: 'sys', time: 'Ayer', text: 'Documento en revisión manual (En espera)' }
       ]
     },
     'Ana Suárez': {
       initials: 'AS', color: '#1B3A4D', role: 'Gerente Comercial', score: '98%',
-      scoreColor: 'var(--forest)', time: 'Lun', lastMsg: 'Adjunto mi hoja de vida actualizada.',
+      scoreColor: 'var(--forest)', time: 'Lun', lastMsg: 'Candidata declinó la oferta.',
+      status: 'blocked',
       tags: ['10 años exp.', 'Cartera B2B', 'Liderazgo'],
-      warnTags: [],
-      analysis: 'Perfil gerencial Top. Cumple todos los requisitos. Se sugiere entrevista directa con la gerencia general.',
+      warnTags: ['Fuera de rango salarial'],
+      analysis: 'Perfil gerencial Top. Cumple todos los requisitos, pero la expectativa salarial supera el presupuesto.',
       email: 'asuarez.comercial@email.com', phone: '+57 315 222 1100',
       messages: [
         { type: 'sora', time: 'Lun', text: 'Estimada Ana, Campuslands se complace en invitarla a la siguiente fase para la Gerencia Comercial. Por favor envíe su hoja de vida actualizada en PDF.' },
-        { type: 'in', time: 'Lun', text: 'Adjunto mi hoja de vida actualizada.' }
+        { type: 'in', time: 'Lun', text: 'Hola, agradezco la invitación pero mis expectativas salariales están por encima de lo que ofrecen. Me retiro del proceso.' },
+        { type: 'sys', time: 'Lun', text: 'Contacto bloqueado / Finalizado' }
       ]
     }
   };
@@ -1647,13 +1953,27 @@ function postRenderChat() {
   const searchInput = document.getElementById('chatSearchInput');
   const miniProfile = document.getElementById('miniProfilePop');
   
+  let currentStatusFilter = 'all';
+
   // Render Sidebar List
-  const renderList = (filter = '') => {
+  const renderList = () => {
+    const textFilter = searchInput ? searchInput.value.toLowerCase() : '';
     listContainer.innerHTML = '';
+    
     Object.keys(chatData).forEach(name => {
-      if (name.toLowerCase().includes(filter.toLowerCase()) || chatData[name].role.toLowerCase().includes(filter.toLowerCase())) {
-        const d = chatData[name];
+      const d = chatData[name];
+      const matchText = name.toLowerCase().includes(textFilter) || d.role.toLowerCase().includes(textFilter);
+      const matchStatus = currentStatusFilter === 'all' || d.status === currentStatusFilter;
+      
+      if (matchText && matchStatus) {
         const isActive = name === window.activeChatName ? 'active' : '';
+        // Helper badge visual
+        let statusDot = '';
+        if(d.status === 'sora') statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--forest);border-radius:50%;margin-right:3px;"></span>';
+        if(d.status === 'manual') statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--ink);border-radius:50%;margin-right:3px;"></span>';
+        if(d.status === 'wait') statusDot = '<span style="display:inline-block;width:6px;height:6px;background:var(--mustard-deep);border-radius:50%;margin-right:3px;"></span>';
+        if(d.status === 'blocked') statusDot = '<span style="display:inline-block;width:6px;height:6px;background:#bf4d4d;border-radius:50%;margin-right:3px;"></span>';
+
         listContainer.innerHTML += `
           <div class="c-item ${isActive}" data-name="${name}">
             <div class="ci-av" style="background:${d.color}; color:#fff;">${d.initials}</div>
@@ -1663,7 +1983,7 @@ function postRenderChat() {
                 <span class="ci-time">${d.time}</span>
               </div>
               <div class="ci-bot">
-                <span class="ci-msg" style="${isActive ? 'font-weight:600;color:var(--ink);' : ''}">${d.lastMsg}</span>
+                <span class="ci-msg" style="${isActive ? 'font-weight:600;color:var(--ink);' : ''}">${statusDot}${d.lastMsg}</span>
               </div>
             </div>
           </div>
@@ -1675,110 +1995,233 @@ function postRenderChat() {
   const loadChat = (name) => {
     window.activeChatName = name;
     const d = chatData[name];
-    renderList(searchInput.value);
+    renderList();
     
     // Update Header
-    document.getElementById('chatTopAv').textContent = d.initials;
-    document.getElementById('chatTopAv').style.background = d.color;
-    document.getElementById('chatTopName').textContent = name;
-    document.getElementById('chatTopRole').textContent = d.role;
+    if(document.getElementById('chatTopAv')) {
+      document.getElementById('chatTopAv').textContent = d.initials;
+      document.getElementById('chatTopAv').style.background = d.color;
+      document.getElementById('chatTopName').textContent = name;
+      document.getElementById('chatTopRole').textContent = d.role;
+    }
     
     // Update Mini Profile
-    document.getElementById('mpAv').textContent = d.initials;
-    document.getElementById('mpAv').style.background = d.color;
-    document.getElementById('mpName').textContent = name;
-    document.getElementById('mpRole').textContent = d.role;
-    document.getElementById('mpPhone').textContent = d.phone;
-    document.getElementById('mpEmail').textContent = d.email;
-    miniProfile.classList.remove('show');
+    if(document.getElementById('mpAv')) {
+      document.getElementById('mpAv').textContent = d.initials;
+      document.getElementById('mpAv').style.background = d.color;
+      document.getElementById('mpName').textContent = name;
+      document.getElementById('mpRole').textContent = d.role;
+      document.getElementById('mpPhone').textContent = d.phone;
+      document.getElementById('mpEmail').textContent = d.email;
+    }
+    if(miniProfile) miniProfile.classList.remove('show');
     
     // Update Copilot
-    document.getElementById('cpScore').textContent = d.score;
-    document.getElementById('cpScoreColor').style.color = d.scoreColor;
-    document.getElementById('cpAnalysis').textContent = d.analysis;
-    const tagsHtml = d.tags.map(t => `<span class="cp-tag">${t}</span>`).join('') + 
-                     d.warnTags.map(t => `<span class="cp-tag warn">${t}</span>`).join('');
-    document.getElementById('cpTags').innerHTML = tagsHtml;
+    if(document.getElementById('cpScore')) {
+      document.getElementById('cpScore').textContent = d.score;
+      document.getElementById('cpScoreColor').style.color = d.scoreColor;
+      document.getElementById('cpAnalysis').textContent = d.analysis;
+      const tagsHtml = d.tags.map(t => `<span class="cp-tag">${t}</span>`).join('') + 
+                       d.warnTags.map(t => `<span class="cp-tag warn">${t}</span>`).join('');
+      document.getElementById('cpTags').innerHTML = tagsHtml;
+    }
     
     // Load Messages
-    chatHistory.innerHTML = '';
-    d.messages.forEach(m => {
-      if (m.type === 'sys') {
-        chatHistory.innerHTML += `<div class="msg-sys">${m.text} • ${m.time}</div>`;
-      } else {
-        const cls = m.type === 'sora' ? 'msg out-sora' : (m.type === 'out-human' ? 'msg out-human' : 'msg in');
-        chatHistory.innerHTML += `
-          <div class="${cls}">
-            <span class="msg-time">${m.time}</span>
-            <div class="msg-bubble">${m.text}</div>
-          </div>
-        `;
+    if(chatHistory) {
+      chatHistory.innerHTML = '';
+      d.messages.forEach(m => {
+        if (m.type === 'sys') {
+          chatHistory.innerHTML += `<div class="msg-sys">${m.text} • ${m.time}</div>`;
+        } else {
+          const cls = m.type === 'sora' ? 'msg out-sora' : (m.type === 'out-human' ? 'msg out-human' : 'msg in');
+          chatHistory.innerHTML += `
+            <div class="${cls}">
+              <span class="msg-time">${m.time}</span>
+              <div class="msg-bubble">${m.text}</div>
+            </div>
+          `;
+        }
+      });
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    // Adjust UI state if it's blocked or manual
+    if(d.status === 'blocked') {
+      if(document.getElementById('btnManualControl')) document.getElementById('btnManualControl').style.display = 'none';
+      if(document.getElementById('chatFooter')) document.getElementById('chatFooter').style.display = 'none';
+    } else {
+      if(document.getElementById('btnManualControl')) document.getElementById('btnManualControl').style.display = 'flex';
+      // If manual is set but footer is hidden, or if it was just loaded
+      if(d.status === 'manual' && document.getElementById('chatFooter').style.display !== 'flex') {
+         toggleManualControl(true);
+      } else if(d.status !== 'manual' && document.getElementById('chatFooter').style.display === 'flex') {
+         endManualControl(true);
       }
-    });
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
   };
+
+  // Status Filter clicks
+  const filterChips = document.querySelectorAll('.cs-filter-chip');
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      filterChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentStatusFilter = chip.dataset.status;
+      renderList();
+    });
+  });
 
   // Init
   loadChat('Carlos Mendoza');
 
   // Search functionality
-  searchInput.addEventListener('input', (e) => renderList(e.target.value));
+  if(searchInput) searchInput.addEventListener('input', () => renderList());
 
   // Chat Item click
-  listContainer.addEventListener('click', (e) => {
-    const item = e.target.closest('.c-item');
-    if (item) loadChat(item.dataset.name);
-  });
+  if(listContainer) {
+    listContainer.addEventListener('click', (e) => {
+      const item = e.target.closest('.c-item');
+      if (item) {
+        loadChat(item.dataset.name);
+        document.querySelector('.chat-wrapper').classList.add('show-chat');
+      }
+    });
+  }
+
+  // Back Button click
+  if(document.getElementById('chatBackBtn')) {
+    document.getElementById('chatBackBtn').addEventListener('click', () => {
+      document.querySelector('.chat-wrapper').classList.remove('show-chat');
+    });
+  }
 
   // Mini profile toggle
-  document.getElementById('chatTopUser').addEventListener('click', (e) => {
-    e.stopPropagation();
-    miniProfile.classList.toggle('show');
-  });
-  document.addEventListener('click', (e) => {
-    if(!miniProfile.contains(e.target)) miniProfile.classList.remove('show');
-  });
+  const chatTopUser = document.getElementById('chatTopUser');
+  if(chatTopUser && miniProfile) {
+    chatTopUser.addEventListener('click', (e) => {
+      e.stopPropagation();
+      miniProfile.classList.toggle('show');
+    });
+    document.addEventListener('click', (e) => {
+      if(!miniProfile.contains(e.target)) miniProfile.classList.remove('show');
+    });
+  }
 
   // Manual Control logic
   const btnManualControl = document.getElementById('btnManualControl');
   const txtManualControl = document.getElementById('txtManualControl');
   const chatFooter = document.getElementById('chatFooter');
+  const manualTimer = document.getElementById('manualTimer');
+  const mtCount = document.getElementById('mtCount');
   
-  btnManualControl.addEventListener('click', () => {
-    if(chatFooter.style.display === 'flex') {
-      chatFooter.style.display = 'none';
-      txtManualControl.textContent = 'Tomar Control Manual';
+  let inactivityTimer = null;
+  let remainingSeconds = 300; // 5 minutes
+
+  const updateTimerUI = () => {
+    const m = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
+    const s = (remainingSeconds % 60).toString().padStart(2, '0');
+    if (mtCount) mtCount.textContent = `${m}:${s}`;
+    if (remainingSeconds <= 60 && manualTimer) manualTimer.classList.add('pulse');
+    else if (manualTimer) manualTimer.classList.remove('pulse');
+  };
+
+  const endManualControl = (silent = false) => {
+    clearInterval(inactivityTimer);
+    if(chatFooter) chatFooter.style.display = 'none';
+    if(manualTimer) manualTimer.classList.remove('show');
+    if(btnManualControl) {
       btnManualControl.classList.remove('primary');
       btnManualControl.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> <span id="txtManualControl">Tomar Control Manual</span>`;
-    } else {
-      chatFooter.style.display = 'flex';
-      txtManualControl.textContent = 'Dejar a la IA';
-      btnManualControl.classList.add('primary');
-      btnManualControl.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span id="txtManualControl">Dejar a la IA</span>`;
     }
-  });
+    // Add system message if not loading chat context
+    if(chatHistory && !silent) {
+      chatData[window.activeChatName].status = 'sora'; // Update status mock
+      renderList();
+      chatHistory.innerHTML += `<div class="msg-sys" style="animation: vacEnter .4s forwards; background: rgba(63,102,87,.12); color: var(--forest);">Sora AI ha retomado el control</div>`;
+      chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+    }
+  };
+
+  const resetTimer = () => {
+    remainingSeconds = 300;
+    updateTimerUI();
+    clearInterval(inactivityTimer);
+    inactivityTimer = setInterval(() => {
+      remainingSeconds--;
+      updateTimerUI();
+      if (remainingSeconds <= 0) {
+        endManualControl();
+      }
+    }, 1000);
+  };
+
+  const toggleManualControl = (silent = false) => {
+    if(chatFooter && chatFooter.style.display === 'flex' && !silent) {
+      endManualControl();
+    } else {
+      if(chatFooter) chatFooter.style.display = 'flex';
+      if(btnManualControl) {
+        btnManualControl.classList.add('primary');
+        btnManualControl.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span id="txtManualControl">Dejar a la IA</span>`;
+      }
+      
+      if(manualTimer) manualTimer.classList.add('show');
+      resetTimer();
+      
+      if(chatHistory && !silent) {
+        chatData[window.activeChatName].status = 'manual'; // Update status mock
+        renderList();
+        chatHistory.innerHTML += `<div class="msg-sys" style="animation: vacEnter .4s forwards;">Control manual activado</div>`;
+        chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+      }
+    }
+  };
+
+  if(btnManualControl) {
+    // Remove old event listeners if any (though usually postRender is called once)
+    const newBtn = btnManualControl.cloneNode(true);
+    btnManualControl.parentNode.replaceChild(newBtn, btnManualControl);
+    newBtn.addEventListener('click', () => toggleManualControl(false));
+  }
 
   // Sending Messages
   const btnSend = document.getElementById('btnSendMsg');
   const chatInput = document.getElementById('chatInput');
   const sendHumanMessage = () => {
+    if(!chatInput) return;
     const val = chatInput.value.trim();
     if(!val) return;
     const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    chatHistory.innerHTML += `
-      <div class="msg out-human">
-        <span class="msg-time">${timeStr}</span>
-        <div class="msg-bubble">${val}</div>
-      </div>
-    `;
-    chatData[window.activeChatName].messages.push({ type: 'out-human', time: timeStr, text: val });
-    chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+    if(chatHistory) {
+      chatHistory.innerHTML += `
+        <div class="msg out-human">
+          <span class="msg-time">${timeStr}</span>
+          <div class="msg-bubble">${val}</div>
+        </div>
+      `;
+      chatData[window.activeChatName].messages.push({ type: 'out-human', time: timeStr, text: val });
+      chatData[window.activeChatName].lastMsg = val; // Update sidebar
+      renderList();
+      chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+    }
     chatInput.value = '';
+    if (chatFooter && chatFooter.style.display === 'flex') resetTimer();
   };
-  btnSend.addEventListener('click', sendHumanMessage);
-  chatInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendHumanMessage(); });
+  
+  if(btnSend) {
+      const newSend = btnSend.cloneNode(true);
+      btnSend.parentNode.replaceChild(newSend, btnSend);
+      newSend.addEventListener('click', sendHumanMessage);
+  }
+  if(chatInput) {
+    const newInput = chatInput.cloneNode(true);
+    chatInput.parentNode.replaceChild(newInput, chatInput);
+    newInput.addEventListener('keypress', (e) => { 
+      if (chatFooter && chatFooter.style.display === 'flex') resetTimer();
+      if(e.key === 'Enter') sendHumanMessage(); 
+    });
+  }
 }
-
 
 function getCandidatosHTML() {
   return `
@@ -3908,7 +4351,7 @@ function postRenderConfig() {
 function getCalendarioHTML() {
   return `
 <style>
-  .cal-wrapper { animation: dashEnter .6s cubic-bezier(.2,.7,.2,1) both; padding-bottom: 2rem; display: flex; flex-direction: column; height: calc(100vh - 100px); min-height: 600px; }
+  .cal-wrapper { animation: dashEnter .6s cubic-bezier(.2,.7,.2,1) both; padding-bottom: 2rem; display: flex; flex-direction: column; height: calc(100vh - 100px); min-height: 600px; position: relative; }
   
   .cal-top { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; flex-shrink: 0; }
   .cal-title { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; color: var(--ink); margin: 0 0 .3rem; }
@@ -3933,40 +4376,27 @@ function getCalendarioHTML() {
   .cv-btn:hover { color: var(--ink); }
   .cv-btn.active { background: var(--white); color: var(--ink); box-shadow: var(--shadow-sm); }
 
+  .btn-new-cita { background: var(--ink); color: var(--white); border: 1px solid var(--ink); padding: .55rem 1.2rem; border-radius: 20px; font-size: .85rem; font-weight: 600; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: .5rem; box-shadow: var(--shadow-sm); }
+  .btn-new-cita:hover { background: var(--ink-soft); border-color: var(--ink-soft); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+
   .cal-grid-wrapper { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; flex: 1; position: relative; }
   
   /* View transition animations */
   .view-container { display: none; flex-direction: column; height: 100%; }
   .view-container.active { display: flex; }
 
-  /* Zoom-in animation (year → month, month → week) */
-  .view-container.anim-zoom-in {
-    animation: calZoomIn .55s cubic-bezier(.2,.7,.2,1) both;
-  }
-  @keyframes calZoomIn {
-    from { opacity: 0; transform: scale(1.15); }
-    to   { opacity: 1; transform: scale(1); }
-  }
+  .view-container.anim-zoom-in { animation: calZoomIn .55s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes calZoomIn { from { opacity: 0; transform: scale(1.15); } to { opacity: 1; transform: scale(1); } }
 
-  /* Zoom-out animation (week → month, month → year) */
-  .view-container.anim-zoom-out {
-    animation: calZoomOut .55s cubic-bezier(.2,.7,.2,1) both;
-  }
-  @keyframes calZoomOut {
-    from { opacity: 0; transform: scale(.85); }
-    to   { opacity: 1; transform: scale(1); }
-  }
+  .view-container.anim-zoom-out { animation: calZoomOut .55s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes calZoomOut { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
 
-  /* Fade-up fallback */
-  .view-container.anim-fade {
-    animation: fadeUp .4s cubic-bezier(.2,.7,.2,1) both;
-  }
+  .view-container.anim-fade { animation: fadeUp .4s cubic-bezier(.2,.7,.2,1) both; }
 
   /* ===================== WEEK VIEW - REDESIGNED ===================== */
-  #viewWeek { overflow-y: auto; overflow-x: hidden; position: relative; }
+  #viewWeek { overflow-y: auto; overflow-x: auto; position: relative; }
 
-  /* Week header - premium horizontal day selector */
-  .wk-header { display: flex; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fdfdfc, var(--white)); position: sticky; top: 0; z-index: 20; padding: 0; }
+  .wk-header { display: flex; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fdfdfc, var(--white)); position: sticky; top: 0; z-index: 20; padding: 0; min-width: 600px; }
   .wk-day-tab { flex: 1; padding: 1rem .5rem; text-align: center; cursor: pointer; transition: all .25s cubic-bezier(.2,.7,.2,1); position: relative; border-right: 1px solid var(--line); }
   .wk-day-tab:last-child { border-right: none; }
   .wk-day-tab:hover { background: rgba(63,102,87,.03); }
@@ -3978,10 +4408,8 @@ function getCalendarioHTML() {
   .wk-day-num { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--ink); display: inline-block; transition: all .2s; }
   .wk-day-count { font-size: .65rem; color: var(--forest); font-weight: 600; display: block; margin-top: .2rem; font-family: var(--font-mono); }
 
-  /* Week body - split layout */
-  .wk-body { display: grid; grid-template-columns: 1fr 340px; flex: 1; min-height: 0; }
+  .wk-body { display: grid; grid-template-columns: 1fr 340px; flex: 1; min-height: 0; min-width: 600px; }
 
-  /* Left: Timeline */
   .wk-timeline { overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 0; position: relative; border-right: 1px solid var(--line); background: #fdfdfc; }
   .wk-timeline::before { content: ''; position: absolute; left: 2.8rem; top: 1.5rem; bottom: 1.5rem; width: 2px; background: linear-gradient(to bottom, var(--line) 0%, rgba(63,102,87,.2) 30%, rgba(63,102,87,.2) 70%, var(--line) 100%); z-index: 0; }
 
@@ -4028,14 +4456,12 @@ function getCalendarioHTML() {
   .wk-tl-meta-item { display: flex; align-items: center; gap: .3rem; font-size: .72rem; color: var(--slate); font-weight: 600; }
   .wk-tl-meta-item svg { width: 13px; height: 13px; color: var(--slate-light); }
 
-  /* Empty state for days with no events */
   .wk-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 2rem; text-align: center; flex: 1; opacity: 0; animation: fadeUp .5s .15s forwards; }
   .wk-empty-icon { width: 56px; height: 56px; border-radius: 50%; background: rgba(63,102,87,.06); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
   .wk-empty-icon svg { color: var(--forest-soft); }
   .wk-empty h4 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; color: var(--ink); margin: 0 0 .3rem; }
   .wk-empty p { font-size: .82rem; color: var(--slate); margin: 0; }
 
-  /* Right: Detail panel */
   .wk-detail { overflow-y: auto; background: linear-gradient(180deg, #fdfdfc, var(--bone)); padding: 1.8rem; display: flex; flex-direction: column; }
   .wk-detail-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; text-align: center; opacity: .6; }
   .wk-detail-empty svg { width: 40px; height: 40px; color: var(--slate-light); margin-bottom: 1rem; }
@@ -4101,7 +4527,6 @@ function getCalendarioHTML() {
   .yg-day.has-events:hover { background: var(--forest); color: white; transform: scale(1.2); }
   .yg-day.off { color: transparent; }
 
-  /* Stagger animation for year months */
   .yg-month { opacity: 0; transform: translateY(20px); animation: ygStagger .5s cubic-bezier(.2,.7,.2,1) forwards; }
   .yg-month:nth-child(1) { animation-delay: .03s; }
   .yg-month:nth-child(2) { animation-delay: .06s; }
@@ -4126,6 +4551,45 @@ function getCalendarioHTML() {
     .wk-body { grid-template-columns: 1fr; }
     .wk-detail { display: none; }
   }
+
+  /* CITA MODAL CSS */
+  .cal-modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(253,253,252,.75); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 100; opacity: 0; transition: opacity .3s; }
+  .cal-modal-overlay.show { display: flex; opacity: 1; }
+  .cal-modal-content { background: var(--white); width: 440px; border-radius: var(--radius-lg); border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(0,0,0,.08); transform: translateY(20px) scale(0.96); transition: all .4s cubic-bezier(.2,.7,.2,1); overflow: hidden; display: flex; flex-direction: column; }
+  .cal-modal-overlay.show .cal-modal-content { transform: none; }
+  
+  .cm-head { padding: 1.5rem; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; background: #fdfdfc; }
+  .cm-head h3 { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; color: var(--ink); margin: 0; }
+  .cm-close { background: var(--pearl); border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--slate); cursor: pointer; transition: all .2s; }
+  .cm-close:hover { background: var(--line); color: var(--ink); }
+
+  .cm-body-form { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem; }
+  .cm-field { display: flex; flex-direction: column; gap: .4rem; }
+  .cm-field label { font-size: .8rem; font-weight: 600; color: var(--slate); text-transform: uppercase; letter-spacing: .02em; }
+  .cm-input { width: 100%; box-sizing: border-box; background: var(--pearl); border: 1px solid transparent; padding: .75rem 1rem; border-radius: var(--radius-sm); font-size: .9rem; color: var(--ink); font-family: inherit; transition: all .2s; outline: none; }
+  .cm-input:focus { background: var(--white); border-color: var(--forest); box-shadow: 0 0 0 3px rgba(63,102,87,.08); }
+  
+  .cm-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+  .cm-type-card { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .8rem .5rem; display: flex; flex-direction: column; align-items: center; gap: .4rem; cursor: pointer; transition: all .2s; background: var(--white); }
+  .cm-type-card:hover { border-color: rgba(63,102,87,.3); background: rgba(63,102,87,.02); }
+  .cm-type-card.selected { border-color: var(--forest); background: rgba(63,102,87,.05); box-shadow: 0 0 0 2px rgba(63,102,87,.15); }
+  .cm-type-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--pearl); color: var(--slate); transition: all .2s; }
+  .cm-type-card.selected .cm-type-icon { background: var(--forest); color: #fff; transform: scale(1.1); }
+  .cm-type-card[data-val="psico"].selected .cm-type-icon { background: var(--mustard-deep); }
+  .cm-type-card[data-val="jefe"].selected .cm-type-icon { background: var(--ink); }
+  .cm-type-card[data-val="psico"].selected { border-color: var(--mustard-deep); background: rgba(217,164,65,.05); box-shadow: 0 0 0 2px rgba(217,164,65,.15); }
+  .cm-type-card[data-val="jefe"].selected { border-color: var(--ink); background: rgba(27,58,77,.05); box-shadow: 0 0 0 2px rgba(27,58,77,.15); }
+  .cm-type-label { font-size: .75rem; font-weight: 600; color: var(--slate); text-align: center; }
+  .cm-type-card.selected .cm-type-label { color: var(--ink); }
+
+  .cm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  .cm-foot { padding: 1.2rem 1.5rem; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: .8rem; background: #fdfdfc; }
+  .cm-btn { padding: .7rem 1.2rem; border-radius: var(--radius-sm); font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: all .2s; }
+  .cm-btn.cancel { background: var(--pearl); color: var(--slate); }
+  .cm-btn.cancel:hover { background: var(--line); color: var(--ink); }
+  .cm-btn.save { background: var(--forest); color: var(--white); display: flex; align-items: center; gap: .4rem; }
+  .cm-btn.save:hover { background: var(--forest-soft); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 </style>
 
 <div class="cal-wrapper">
@@ -4158,16 +4622,19 @@ function getCalendarioHTML() {
       <button class="cf-btn" data-filter="jefe"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Jefes de Proceso</button>
     </div>
     
-    <div class="cal-views" id="calViews">
-      <button class="cv-btn" data-view="year">Año</button>
-      <button class="cv-btn" data-view="month">Mes</button>
-      <button class="cv-btn active" data-view="week">Semana</button>
+    <div style="display:flex; gap:1rem; align-items:center;">
+      <button class="btn-new-cita" id="btnNewCita"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Programar Cita</button>
+      <div class="cal-views" id="calViews">
+        <button class="cv-btn" data-view="year">Año</button>
+        <button class="cv-btn" data-view="month">Mes</button>
+        <button class="cv-btn active" data-view="week">Semana</button>
+      </div>
     </div>
   </div>
 
   <div class="cal-grid-wrapper">
     
-    <!-- WEEK VIEW (redesigned) -->
+    <!-- WEEK VIEW -->
     <div class="view-container active" id="viewWeek">
       <div class="wk-header" id="wkHeader"></div>
       <div class="wk-body">
@@ -4200,6 +4667,63 @@ function getCalendarioHTML() {
       </div>
     </div>
 
+  </div>
+
+  <!-- MODAL CITA -->
+  <div class="cal-modal-overlay" id="modalNewCita">
+    <div class="cal-modal-content">
+      <div class="cm-head">
+        <h3>Programar Cita</h3>
+        <button class="cm-close" id="btnCitaClose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="cm-body-form">
+        <div class="cm-field">
+          <label>Nombre del Candidato</label>
+          <input type="text" class="cm-input" id="inpCitaName" placeholder="Ej. Camila Torres">
+        </div>
+        <div class="cm-row">
+          <div class="cm-field">
+            <label>Perfil / Rol</label>
+            <input type="text" class="cm-input" id="inpCitaRole" placeholder="Ej. Operario Desposte">
+          </div>
+          <div class="cm-field">
+            <label>Teléfono</label>
+            <input type="text" class="cm-input" id="inpCitaPhone" placeholder="+57 300 000 0000">
+          </div>
+        </div>
+        <div class="cm-row">
+          <div class="cm-field">
+            <label>Fecha (Mes-Día)</label>
+            <input type="text" class="cm-input" id="inpCitaDate" placeholder="Ej. 05-16">
+          </div>
+          <div class="cm-field">
+            <label>Hora</label>
+            <input type="text" class="cm-input" id="inpCitaTime" placeholder="10:00" value="10:00">
+          </div>
+        </div>
+        <div class="cm-field">
+          <label>Tipo de Entrevista</label>
+          <div class="cm-type-grid" id="citaTypeGrid">
+            <div class="cm-type-card selected" data-val="normal">
+              <div class="cm-type-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+              <span class="cm-type-label">Normal</span>
+            </div>
+            <div class="cm-type-card" data-val="psico">
+              <div class="cm-type-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+              <span class="cm-type-label">Psicotécnica</span>
+            </div>
+            <div class="cm-type-card" data-val="jefe">
+              <div class="cm-type-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+              <span class="cm-type-label">Jefe Proceso</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cm-foot">
+        <button class="cm-btn cancel" id="btnCitaCancel">Cancelar</button>
+        <button class="cm-btn save" id="btnCitaSave"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Guardar Cita</button>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -4473,71 +4997,150 @@ function postRenderCalendario() {
     });
   }
 
-  // -- Animated view switching --
-  function switchCalView(targetView, animType) {
-    const viewMap = { year: 'viewYear', month: 'viewMonth', week: 'viewWeek' };
-    const viewContainers = document.querySelectorAll('.view-container');
-    const views = document.getElementById('calViews');
-
-    views.querySelectorAll('.cv-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.view === targetView);
-    });
-
-    viewContainers.forEach(v => {
-      v.classList.remove('active', 'anim-zoom-in', 'anim-zoom-out', 'anim-fade');
-    });
-
-    updateTitles();
-
-    const targetEl = document.getElementById(viewMap[targetView]);
-    const animClass = animType === 'zoom-in' ? 'anim-zoom-in' : (animType === 'zoom-out' ? 'anim-zoom-out' : 'anim-fade');
-    targetEl.classList.add(animClass);
-    targetEl.classList.add('active');
-
-    if (targetView === 'week') {
+  // -- Filters logic --
+  const filters = document.querySelectorAll('.cf-btn');
+  filters.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filters.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
       renderWeekHeader();
       renderWeekTimeline();
       renderWeekDetail();
+      renderMonth();
+      renderYear();
+      
+      const totalCount = events.filter(e => (currentFilter === 'all' || e.type === currentFilter)).length;
+      document.getElementById('metCitas').textContent = totalCount;
+    });
+  });
+
+  // -- View Switch logic --
+  const viewBtns = document.querySelectorAll('.cv-btn');
+  const viewContainers = {
+    'year': document.getElementById('viewYear'),
+    'month': document.getElementById('viewMonth'),
+    'week': document.getElementById('viewWeek')
+  };
+  
+  const levels = { 'year': 1, 'month': 2, 'week': 3 };
+
+  function switchCalView(toView, forceAnim) {
+    const fromBtn = document.querySelector('.cv-btn.active');
+    const fromView = fromBtn ? fromBtn.dataset.view : 'week';
+    
+    viewBtns.forEach(b => b.classList.remove('active'));
+    const toBtn = document.querySelector('.cv-btn[data-view="' + toView + '"]');
+    if (toBtn) toBtn.classList.add('active');
+
+    updateTitles();
+
+    if (fromView === toView) return;
+
+    let animClass = 'anim-fade';
+    if (forceAnim) {
+      animClass = 'anim-' + forceAnim;
+    } else {
+      if (levels[toView] > levels[fromView]) animClass = 'anim-zoom-in';
+      else animClass = 'anim-zoom-out';
     }
-    if (targetView === 'month') renderMonth();
-    if (targetView === 'year') renderYear();
+
+    Object.values(viewContainers).forEach(c => {
+      if (!c) return;
+      c.classList.remove('active', 'anim-zoom-in', 'anim-zoom-out', 'anim-fade');
+      if (c.id === 'view' + toView.charAt(0).toUpperCase() + toView.slice(1)) {
+        c.classList.add('active', animClass);
+      }
+    });
+
+    if (toView === 'month') renderMonth();
+    if (toView === 'year') renderYear();
+    if (toView === 'week') { renderWeekHeader(); renderWeekTimeline(); renderWeekDetail(); }
   }
 
-  // -- Setup filter interactions --
-  const filters = document.getElementById('calFilters');
-  if(filters) {
-    filters.addEventListener('click', (e) => {
-      const btn = e.target.closest('.cf-btn');
-      if(btn) {
-        filters.querySelectorAll('.cf-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentFilter = btn.dataset.filter;
-        renderWeekHeader();
-        renderWeekTimeline();
-        renderWeekDetail();
-        renderMonth();
-        renderYear();
-        // Update metrics
-        const totalCount = events.filter(e => (currentFilter === 'all' || e.type === currentFilter)).length;
-        document.getElementById('metCitas').textContent = totalCount;
-      }
+  if (viewBtns) {
+    viewBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const toView = btn.dataset.view;
+        const fromView = document.querySelector('.cv-btn.active').dataset.view;
+        let animType = 'fade';
+        if (levels[toView] > levels[fromView]) animType = 'zoom-in';
+        if (levels[toView] < levels[fromView]) animType = 'zoom-out';
+        switchCalView(toView, animType);
+      });
     });
   }
 
-  // -- Setup view buttons with animated transitions --
-  const viewsEl = document.getElementById('calViews');
-  if(viewsEl) {
-    const viewOrder = ['year', 'month', 'week'];
-    viewsEl.addEventListener('click', (e) => {
-      const btn = e.target.closest('.cv-btn');
-      if(!btn || btn.classList.contains('active')) return;
-      const currentBtn = viewsEl.querySelector('.cv-btn.active');
-      const fromView = currentBtn ? currentBtn.dataset.view : 'week';
-      const toView = btn.dataset.view;
-      const fromIdx = viewOrder.indexOf(fromView);
-      const toIdx = viewOrder.indexOf(toView);
-      const animType = toIdx > fromIdx ? 'zoom-in' : 'zoom-out';
-      switchCalView(toView, animType);
+  // --- New Cita Modal Logic ---
+  const btnNew = document.getElementById('btnNewCita');
+  const modal = document.getElementById('modalNewCita');
+  const btnClose = document.getElementById('btnCitaClose');
+  const btnCancel = document.getElementById('btnCitaCancel');
+  const btnSave = document.getElementById('btnCitaSave');
+  
+  if(btnNew && modal) {
+    btnNew.addEventListener('click', () => {
+      const mStr = (activeMonth + 1).toString().padStart(2, '0');
+      const dStr = (weekSelectedDate.getDate()).toString().padStart(2, '0');
+      document.getElementById('inpCitaDate').value = mStr + '-' + dStr;
+      
+      modal.classList.add('show');
+    });
+    
+    const closeModal = () => modal.classList.remove('show');
+    btnClose.addEventListener('click', closeModal);
+    btnCancel.addEventListener('click', closeModal);
+    
+    const typeCards = document.querySelectorAll('.cm-type-card');
+    let selectedType = 'normal';
+    typeCards.forEach(card => {
+      card.addEventListener('click', () => {
+        typeCards.forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedType = card.dataset.val;
+      });
+    });
+    
+    btnSave.addEventListener('click', () => {
+      const name = document.getElementById('inpCitaName').value || 'Candidato (Nuevo)';
+      const role = document.getElementById('inpCitaRole').value || 'Perfil Pendiente';
+      const phone = document.getElementById('inpCitaPhone').value || '+57 300 000 0000';
+      const time = document.getElementById('inpCitaTime').value || '09:00';
+      const dateStr = document.getElementById('inpCitaDate').value || '05-14';
+      
+      const parts = dateStr.split('-');
+      const mo = (parseInt(parts[0]) || (activeMonth + 1)) - 1; 
+      const da = parseInt(parts[1]) || 14;
+      
+      events.push({
+        year: activeYear,
+        month: mo,
+        date: da,
+        type: selectedType,
+        title: name,
+        role: role,
+        status: 'Programada',
+        statusClass: 'b-pend',
+        time: time,
+        duration: '1h',
+        phone: phone,
+        isLive: false
+      });
+      
+      weekSelectedDate = new Date(activeYear, mo, da);
+      activeMonth = mo;
+      
+      closeModal();
+      
+      updateTitles();
+      renderWeekHeader();
+      renderWeekTimeline();
+      renderWeekDetail();
+      renderMonth();
+      renderYear();
+      
+      const totalCount = events.filter(e => (currentFilter === 'all' || e.type === currentFilter)).length;
+      document.getElementById('metCitas').textContent = totalCount;
     });
   }
 
@@ -4557,3 +5160,4 @@ function postRenderCalendario() {
 </script>
 </body>
 </html>
+
